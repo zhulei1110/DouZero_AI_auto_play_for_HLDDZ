@@ -1,0 +1,5 @@
+numpy~=1.23.5
+opencv-python~=4.9.0.80
+Pillow~=10.2.0
+pywin32==306
+scikit-image~=0.21.0
