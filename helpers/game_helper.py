@@ -38,26 +38,32 @@ class GameHelper:
         self.screenHelper = ScreenHelper()
         self.templateImages = self.imageLocator.templateImages
 
-    def findCards(self, image, pos, mark='my', confidence=0.8):
+    def findCards(self, image, pos, mark='my', scale=None, confidence=0.8):
         cards = ""
         D_king = 0
         X_king = 0
 
         for card in AllCards:
-            template = self.templateImages[mark + '_' + card]
-            result = self.imageLocator.LocateAllOnImage(image, template, region=pos, confidence=confidence)
+            resizeScale = scale
+            if scale is not None and (card == "X" or card == "D"):
+                if mark == "my":
+                    resizeScale = scale *  0.88
+                if mark == "three":
+                    resizeScale = scale *  0.75
+
+            template = self.templateImages[card]
+            result = self.imageLocator.LocateAllOnImage(image, template, region=pos, scale=resizeScale, confidence=confidence)
             if len(result) > 0:
                 count, posList = cards_filter(list(result), self.distance)
                 if card == "X" or card == "D":
                     for p in posList:
                         classifier = CC.ColorClassifier(debug=True)
                         img1 = image[pos[1]:pos[1] + pos[3], pos[0]:pos[0] + pos[2]]
-                        img2 = img1[p[1]:p[1] + p[3] - 50, p[0]:p[0] + 20]
+                        img2 = img1[p[1]:p[1] + p[3] - int((p[1] + p[3]) * 0.72), p[0]:p[0] + 16]
                         result = classifier.classify(img2)
-
                         for r in result:
                             if r[0] == "Red":
-                                if r[1] > 0.7:
+                                if r[1] > 0.6:
                                     D_king = 1
                                 else:
                                     X_king = 1
@@ -78,21 +84,24 @@ class GameHelper:
         screenshot, _ = self.screenHelper.getScreenshot()
         myHandCardsPos = self.screenHelper.getMyHandCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        my_hand_cards = self.findCards(image, myHandCardsPos)
+        scale = self.imageLocator.getResizeScale(image)
+        my_hand_cards = self.findCards(image, myHandCardsPos, mark='my', scale=scale)
         return my_hand_cards
     
     def findThreeCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         threeCardsPos = self.screenHelper.getThreeCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        three_cards = self.findCards(image, threeCardsPos, mark='three')
+        scale = self.imageLocator.getResizeScale(image) * 0.72      # 0.68 ~ 0.76
+        three_cards = self.findCards(image, threeCardsPos, mark='three', scale=scale)
         return three_cards
     
     def findLeftPlayedCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         leftPlayedCardsPos = self.screenHelper.getLeftPlayedCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        left_played_cards = self.findCards(image, leftPlayedCardsPos)
+        scale = self.imageLocator.getResizeScale(image) * 0.89      # 0.84 ~ 0.93
+        left_played_cards = self.findCards(image, leftPlayedCardsPos, mark='LPC', scale=scale)
         return left_played_cards
     
 
@@ -102,8 +111,8 @@ if __name__ == "__main__":
     my_hand_cards = gameHelper.findMyHandCards()
     print('my_hand_cards: ', my_hand_cards)
 
-    # three_cards = gameHelper.findThreeCards()
-    # print('three_cards: ', three_cards)
+    three_cards = gameHelper.findThreeCards()
+    print('three_cards: ', three_cards)
 
-    # left_played_cards = gameHelper.findLeftPlayedCards()
-    # print('left_played_cards: ', left_played_cards)
+    left_played_cards = gameHelper.findLeftPlayedCards()
+    print('left_played_cards: ', left_played_cards)

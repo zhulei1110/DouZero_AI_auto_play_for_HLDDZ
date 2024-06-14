@@ -16,12 +16,17 @@ class ImageLocator:
 
         # print('self.templateImages: ', self.templateImages)
 
-    # 查找所有匹配位置，返回所有坐标的列表
-    def LocateAllOnImage(self, image, template, region=None, confidence=0.8):
+    def getResizeScale(self, image):
         window_w, window_h = image.shape[1], image.shape[0]
-        scale_w = window_w / float(1024)
-        scale_h = window_h / float(576)
+        scale_w = window_w / float(1920)
+        scale_h = window_h / float(1080)
         scale = min(scale_w, scale_h)
+        return scale
+
+    # 查找所有匹配位置，返回所有坐标的列表
+    def LocateAllOnImage(self, image, template, region=None, scale=None, confidence=0.8):
+        if scale is None:
+            scale = self.getResizeScale(image)
 
         if region is not None:
             x, y, w, h = region
