@@ -7,6 +7,7 @@ from helpers.image_locator import ImageLocator
 from helpers.screen_helper import ScreenHelper
 
 AllCards = ['D', 'X', '2', 'A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3']
+# AllCards = ['D', 'X']
 
 # 牌检测结果滤波
 # 过滤掉相互距离太近的牌，只保留相距超过一定距离的牌
@@ -48,9 +49,12 @@ class GameHelper:
             if scale is not None and (card == "X" or card == "D"):
                 if mark == "my":
                     resizeScale = scale *  0.88
+                if mark == "playedCards":
+                    resizeScale = scale *  0.82
                 if mark == "three":
                     resizeScale = scale *  0.75
-
+            
+            # print('card:', card, ', pos:', pos, ', resizeScale:', resizeScale, ', confidence:', confidence)
             template = self.templateImages[card]
             result = self.imageLocator.LocateAllOnImage(image, template, region=pos, scale=resizeScale, confidence=confidence)
             if len(result) > 0:
@@ -59,11 +63,16 @@ class GameHelper:
                     for p in posList:
                         classifier = CC.ColorClassifier(debug=True)
                         img1 = image[pos[1]:pos[1] + pos[3], pos[0]:pos[0] + pos[2]]
-                        img2 = img1[p[1]:p[1] + p[3] - int((p[1] + p[3]) * 0.72), p[0]:p[0] + 16]
+                        img2 = img1[p[1]:p[1] + 26, p[0]:p[0] + 16]
+                        # print(p[1], ':', p[1] + 26)
+                        # print(p[0], ':', p[0] + 16)
+                        # cv2.imwrite('test1.png', img1)
+                        # cv2.imwrite('test2.png', img2)
                         result = classifier.classify(img2)
+                        print(result)
                         for r in result:
                             if r[0] == "Red":
-                                if r[1] > 0.6:
+                                if r[1] > 0.7:
                                     D_king = 1
                                 else:
                                     X_king = 1
@@ -83,36 +92,74 @@ class GameHelper:
     def findMyHandCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         myHandCardsPos = self.screenHelper.getMyHandCardsPos()
+
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.getResizeScale(image)
+
         my_hand_cards = self.findCards(image, myHandCardsPos, mark='my', scale=scale)
         return my_hand_cards
     
     def findThreeCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         threeCardsPos = self.screenHelper.getThreeCardsPos()
+
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.getResizeScale(image) * 0.72      # 0.68 ~ 0.76
+
         three_cards = self.findCards(image, threeCardsPos, mark='three', scale=scale)
         return three_cards
     
     def findLeftPlayedCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
+        # screenshot = Image.open('left_d_wang.png')
         leftPlayedCardsPos = self.screenHelper.getLeftPlayedCardsPos()
+
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.getResizeScale(image) * 0.89      # 0.84 ~ 0.93
-        left_played_cards = self.findCards(image, leftPlayedCardsPos, mark='LPC', scale=scale)
+
+        left_played_cards = self.findCards(image, leftPlayedCardsPos, mark='playedCards', scale=scale)
         return left_played_cards
     
+    def findRightPlayedCards(self):
+        screenshot, _ = self.screenHelper.getScreenshot()
+        # screenshot = Image.open("right_x_wang.png")
+        rightPlayedCardsPos = self.screenHelper.getRightPlayedCardsPos()
+
+        image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
+        scale = self.imageLocator.getResizeScale(image) * 0.89      # 0.84 ~ 0.93
+
+        left_played_cards = self.findCards(image, rightPlayedCardsPos, mark='playedCards', scale=scale)
+        return left_played_cards
+    
+    def findMyPlayedCards(self):
+        screenshot, _ = self.screenHelper.getScreenshot()
+        myPlayedCardsPos = self.screenHelper.getMyPlayedCardsPos()
+
+        image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
+        scale = self.imageLocator.getResizeScale(image) * 0.89      # 0.84 ~ 0.93
+
+        left_played_cards = self.findCards(image, myPlayedCardsPos, mark='playedCards', scale=scale)
+        return left_played_cards
 
 if __name__ == "__main__":
     gameHelper = GameHelper()
     
-    my_hand_cards = gameHelper.findMyHandCards()
-    print('my_hand_cards: ', my_hand_cards)
+    # my_hand_cards = gameHelper.findMyHandCards()
+    # print('my_hand_cards: ', my_hand_cards)
 
-    three_cards = gameHelper.findThreeCards()
-    print('three_cards: ', three_cards)
+    # three_cards = gameHelper.findThreeCards()
+    # print('three_cards: ', three_cards)
 
-    left_played_cards = gameHelper.findLeftPlayedCards()
-    print('left_played_cards: ', left_played_cards)
+    # print()
+    # left_played_cards = gameHelper.findLeftPlayedCards()
+    # print('left_played_cards: ', left_played_cards)
+
+    # print()
+    # right_played_cards = gameHelper.findRightPlayedCards()
+    # print('right_played_cards: ', right_played_cards)
+
+    # print()
+    # my_played_cards = gameHelper.findMyPlayedCards()
+    # print('my_played_cards: ', my_played_cards)
+
+    print()

@@ -31,9 +31,13 @@ class ImageLocator:
         if region is not None:
             x, y, w, h = region
             image = image[y:y + h, x:x + w]
+            # filename = str(region).replace(' ', '').replace(',', '_')
+            # cv2.imwrite(filename + '.png', image)
 
         image_w, image_h = image.shape[1], image.shape[0]
         template = cv2.resize(template, None, fx=scale, fy=scale)
+
+        # cv2.imwrite(filename + '_template_resize_after.png', template)
 
         # 使用 OpenCV 的 matchTemplate 函数在 image 中搜索 template
         # cv2.TM_CCOEFF_NORMED 是一种匹配方法，返回一个结果矩阵 res，其中每个值表示模板与图像对应位置的匹配程度
@@ -50,6 +54,7 @@ class ImageLocator:
             # 对于每个匹配位置 pt，将其左上角坐标 (pt[0], pt[1]) 和图像尺寸 (w, h) 添加到 points 列表中
             points.append((pt[0], pt[1], image_w, image_h))
 
+        # print('points: ', points)
         return points
 
     # 只查找第一个匹配位置，返回单个坐标或 None

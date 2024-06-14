@@ -211,7 +211,7 @@ class ScreenHelper:
                     image, result = self.captureScreenshot(gameWindow, captureWidth, captureHeight)
                 
                 print('captureScreenshot image: ', image)
-                print('captureScreenshot result: ', result)
+                # print('captureScreenshot result: ', result)
 
                 if image is None:
                     raise Exception("getScreenshot failed")
