@@ -58,13 +58,22 @@ class ImageLocator:
         return points
 
     # 只查找第一个匹配位置，返回单个坐标或 None
-    def LocateOnImage(self, image, template, region=None, confidence=0.8):
+    def LocateOnImage(self, image, template, region=None, scale=None, confidence=0.8):
+        if scale is None:
+            scale = self.getResizeScale(image)
+
         if region is not None:
             x, y, w, h = region
             image = image[y:y + h, x:x + w, :]
+            filename = str(region).replace(' ', '').replace(',', '_')
+            cv2.imwrite(filename + '.png', image)
+
+        template = cv2.resize(template, None, fx=scale, fy=scale)
+        cv2.imwrite(filename + '_template_resize_after.png', template)
 
         res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
-
+        print(res)
+        
         # 查找最佳匹配位置
         # 使用 cv2.minMaxLoc 函数查找匹配结果矩阵 res 中的最大值及其位置。
         # maxLoc 是最大值的位置，即模板在图像中最佳匹配的位置。
@@ -77,17 +86,17 @@ class ImageLocator:
         else:
             return None
 
-    def LocateOnScreen(self, templateName, region, confidence=0.8, img=None):
+    def LocateOnScreen(self, templateName, region, scale=None, confidence=0.8, img=None):
         if img is not None:
             image = img
         else:
             image, position = self.screenHelper.getScreenshot()
-            print('image: ', image)
-            print('position: ', position)
+            # print('image: ', image)
+            # print('position: ', position)
         
         # 将 PIL 格式图像转换为 OpenCV 格式（BGR）
         imgcv = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
 
         # 调用 LocateOnImage 函数在图像中查找模板图像的位置
-        result = self.LocateOnImage(imgcv, self.templateImages[templateName], region=region, confidence=confidence)
+        result = self.LocateOnImage(imgcv, self.templateImages[templateName], region=region, scale=scale, confidence=confidence)
         return result

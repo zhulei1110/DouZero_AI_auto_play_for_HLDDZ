@@ -1,13 +1,15 @@
 import cv2
 import numpy as np
+import time
+
 from PIL import Image
+from skimage.metrics import structural_similarity as ssim
 
 import helpers.color_classifier as CC
 from helpers.image_locator import ImageLocator
 from helpers.screen_helper import ScreenHelper
 
 AllCards = ['D', 'X', '2', 'A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3']
-# AllCards = ['D', 'X']
 
 # 牌检测结果滤波
 # 过滤掉相互距离太近的牌，只保留相距超过一定距离的牌
@@ -141,25 +143,53 @@ class GameHelper:
         left_played_cards = self.findCards(image, myPlayedCardsPos, mark='playedCards', scale=scale)
         return left_played_cards
 
+    def compareImage(img1, img2):
+        # 转换为灰度图
+        gray1 = cv2.cvtColor(np.asarray(img1), cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(np.asarray(img2), cv2.COLOR_BGR2GRAY)
+
+        # 使用结构相似性指数（SSIM）比较相似度
+        ssim_index, _ = ssim(gray1, gray2, full=True)
+        if ssim_index < 0.99:
+            return True
+
+        return False
+    
+    def haveAnimation(self, waitingTime=0.1, regions=None):
+        if regions is None:
+            return False
+        
+        image, _ = self.screenHelper.getScreenshot()
+        previousImage = image
+        for i in range(2):
+            time.sleep(waitingTime)
+            image, _ = self.screenHelper.getScreenshot()
+            for region in regions:
+                if self.compareImage(image.crop(region), previousImage.crop(region)):
+                    return True
+            previousImage = image
+
+        return False
+
 if __name__ == "__main__":
     gameHelper = GameHelper()
     
-    # my_hand_cards = gameHelper.findMyHandCards()
-    # print('my_hand_cards: ', my_hand_cards)
+    my_hand_cards = gameHelper.findMyHandCards()
+    print('my_hand_cards: ', my_hand_cards)
 
-    # three_cards = gameHelper.findThreeCards()
-    # print('three_cards: ', three_cards)
+    three_cards = gameHelper.findThreeCards()
+    print('three_cards: ', three_cards)
 
-    # print()
-    # left_played_cards = gameHelper.findLeftPlayedCards()
-    # print('left_played_cards: ', left_played_cards)
+    print()
+    left_played_cards = gameHelper.findLeftPlayedCards()
+    print('left_played_cards: ', left_played_cards)
 
-    # print()
-    # right_played_cards = gameHelper.findRightPlayedCards()
-    # print('right_played_cards: ', right_played_cards)
+    print()
+    right_played_cards = gameHelper.findRightPlayedCards()
+    print('right_played_cards: ', right_played_cards)
 
-    # print()
-    # my_played_cards = gameHelper.findMyPlayedCards()
-    # print('my_played_cards: ', my_played_cards)
+    print()
+    my_played_cards = gameHelper.findMyPlayedCards()
+    print('my_played_cards: ', my_played_cards)
 
     print()

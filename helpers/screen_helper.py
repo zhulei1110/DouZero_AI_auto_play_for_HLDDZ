@@ -125,26 +125,26 @@ class ScreenHelper:
 
     # 左边玩家地主标志
     def getLeftLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.08)
-        top = int(self.WindowHeight * 0.28)
-        width = int(self.WindowWidth * 0.05)
-        height = int(self.WindowHeight * 0.1)
+        left = int(self.WindowWidth * 0.082)
+        top = int(self.WindowHeight * 0.288)
+        width = int(self.WindowWidth * 0.042)
+        height = int(self.WindowHeight * 0.08)
         return (left, top, width, height)
     
     # 右边玩家地主标志
     def getRightLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.857)
-        top = int(self.WindowHeight * 0.285)
-        width = int(self.WindowWidth * 0.05)
-        height = int(self.WindowHeight * 0.1)
+        left = int(self.WindowWidth * 0.862)
+        top = int(self.WindowHeight * 0.288)
+        width = int(self.WindowWidth * 0.042)
+        height = int(self.WindowHeight * 0.08)
         return (left, top, width, height)
     
     # 我的地主标志
     def getMyLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.004)
-        top = int(self.WindowHeight * 0.8)
-        width = int(self.WindowWidth * 0.05)
-        height = int(self.WindowHeight * 0.1)
+        left = int(self.WindowWidth * 0.005)
+        top = int(self.WindowHeight * 0.781)
+        width = int(self.WindowWidth * 0.042)
+        height = int(self.WindowHeight * 0.08)
         return (left, top, width, height)
 
     # 左边玩家剩余牌数
@@ -161,6 +161,79 @@ class ScreenHelper:
         top = int(self.WindowHeight * 0.482)
         width = int(self.WindowWidth * 0.025)
         height = int(self.WindowHeight * 0.06)
+        return (left, top, width, height)
+
+    # 聊天按钮
+    def getChatBtnPos(self):
+        left = int(self.WindowWidth * 0.915)
+        top = int(self.WindowHeight * 0.935)
+        width = int(self.WindowWidth * 0.079)
+        height = int(self.WindowHeight * 0.07)
+        return (left, top, width, height)
+    
+    # 底牌封面
+    def getThreeCardFrontCoverPos(self):
+        left = int(self.WindowWidth * 0.42)
+        top = int(self.WindowHeight * 0.045)
+        width = int(self.WindowWidth * 0.06)
+        height = int(self.WindowHeight * 0.12)
+        return (left, top, width, height)
+    
+    # 快速开始按钮
+    def getQuickStartBtnPos(self):
+        left = int(self.WindowWidth * 0.792)
+        top = int(self.WindowHeight * 0.875)
+        width = int(self.WindowWidth * 0.192)
+        height = int(self.WindowHeight * 0.1)
+        return (left, top, width, height)
+    
+    # 开始游戏按钮
+    def getStartGameBtnPos(self):
+        left = int(self.WindowWidth * 0.514)
+        top = int(self.WindowHeight * 0.605)
+        width = int(self.WindowWidth * 0.15)
+        height = int(self.WindowHeight * 0.1)
+        return (left, top, width, height)
+    
+    # 继续游戏按钮
+    def getContinueGameBtnPos(self):
+        left = int(self.WindowWidth * 0.75)
+        top = int(self.WindowHeight * 0.777)
+        width = int(self.WindowWidth * 0.134)
+        height = int(self.WindowHeight * 0.072)
+        return (left, top, width, height)
+    
+    # 对局结束后各个玩家输赢豆
+    def getBeansRegionsPos(self):
+        # 我
+        left1 = int(self.WindowWidth * 0.224)
+        top1 = int(self.WindowHeight * 0.602)
+        width1 = int(self.WindowWidth * 0.028)
+        height1 = int(self.WindowHeight * 0.05)
+        # 左
+        left2 = int(self.WindowWidth * 0.226)
+        top2 = int(self.WindowHeight * 0.268)
+        width2 = int(self.WindowWidth * 0.028)
+        height2 = int(self.WindowHeight * 0.05)
+        # 右
+        left3 = int(self.WindowWidth * 0.627)
+        top3 = int(self.WindowHeight * 0.269)
+        width3 = int(self.WindowWidth * 0.028)
+        height3 = int(self.WindowHeight * 0.05)
+        return [(left1, top1, width1, height1), (left2, top2, width2, height2), (left3, top3, width3, height3)]
+
+    def getLoseTextPos(self):
+        left = int(self.WindowWidth * 0.514)
+        top = int(self.WindowHeight * 0.212)
+        width = int(self.WindowWidth * 0.141)
+        height = int(self.WindowHeight * 0.151)
+        return (left, top, width, height)
+    
+    def getWinTextPos(self):
+        left = int(self.WindowWidth * 0.514)
+        top = int(self.WindowHeight * 0.212)
+        width = int(self.WindowWidth * 0.141)
+        height = int(self.WindowHeight * 0.126)
         return (left, top, width, height)
 
     def captureScreenshot(self, gameWindow, width, height):
