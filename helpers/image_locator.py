@@ -16,7 +16,11 @@ class ImageLocator:
 
         # print('self.templateImages: ', self.templateImages)
 
-    def getResizeScale(self, image):
+    def getResizeScale(self, image=None):
+        if image is None:
+            screenshot, _ = self.screenHelper.getScreenshot()
+            image = np.asarray(screenshot)
+
         window_w, window_h = image.shape[1], image.shape[0]
         scale_w = window_w / float(1920)
         scale_h = window_h / float(1080)
@@ -31,13 +35,14 @@ class ImageLocator:
         if region is not None:
             x, y, w, h = region
             image = image[y:y + h, x:x + w]
-            # filename = str(region).replace(' ', '').replace(',', '_')
-            # cv2.imwrite(filename + '.png', image)
+            filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
+            cv2.imwrite(f'logs/{filename}_screenshot.png', image)
 
         image_w, image_h = image.shape[1], image.shape[0]
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
-        # cv2.imwrite(filename + '_template_resize_after.png', template)
+        scaleText = f"{scale:.{4}f}".replace('.', '-')
+        cv2.imwrite(f'logs/{filename}_template_scale_{scaleText}.png', template)
 
         # 使用 OpenCV 的 matchTemplate 函数在 image 中搜索 template
         # cv2.TM_CCOEFF_NORMED 是一种匹配方法，返回一个结果矩阵 res，其中每个值表示模板与图像对应位置的匹配程度
@@ -65,14 +70,15 @@ class ImageLocator:
         if region is not None:
             x, y, w, h = region
             image = image[y:y + h, x:x + w, :]
-            filename = str(region).replace(' ', '').replace(',', '_')
-            cv2.imwrite(filename + '.png', image)
+            filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
+            cv2.imwrite(f'logs/{filename}_screenshot.png', image)
 
         template = cv2.resize(template, None, fx=scale, fy=scale)
-        cv2.imwrite(filename + '_template_resize_after.png', template)
+        scaleText = f"{scale:.{4}f}".replace('.', '-')
+        cv2.imwrite(f'logs/{filename}_template_scale_{scaleText}.png', template)
 
         res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
-        print(res)
+        # print(res)
         
         # 查找最佳匹配位置
         # 使用 cv2.minMaxLoc 函数查找匹配结果矩阵 res 中的最大值及其位置。
@@ -86,17 +92,17 @@ class ImageLocator:
         else:
             return None
 
-    def LocateOnScreen(self, templateName, region, scale=None, confidence=0.8, img=None):
-        if img is not None:
-            image = img
+    def LocateOnScreen(self, templateName, region, scale=None, confidence=0.8, image=None):
+        if image is not None:
+            screenshot = image
         else:
-            image, position = self.screenHelper.getScreenshot()
+            screenshot, position = self.screenHelper.getScreenshot()
             # print('image: ', image)
             # print('position: ', position)
         
         # 将 PIL 格式图像转换为 OpenCV 格式（BGR）
-        imgcv = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+        imgcv = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
 
         # 调用 LocateOnImage 函数在图像中查找模板图像的位置
-        result = self.LocateOnImage(imgcv, self.templateImages[templateName], region=region, scale=scale, confidence=confidence)
+        result = self.LocateOnImage(image=imgcv, template=self.templateImages[templateName], region=region, scale=scale, confidence=confidence)
         return result

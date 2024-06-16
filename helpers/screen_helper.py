@@ -19,12 +19,52 @@ class ScreenHelper:
     def getZoomRate(self):
         self.ScreenZoomRate = ctypes.windll.shcore.GetScaleFactorForDevice(0) / 100
     
+    # 聊天按钮区域
+    def getChatBtnPos(self):
+        left = int(self.WindowWidth * 0.91)
+        top = int(self.WindowHeight * 0.925)
+        width = int(self.WindowWidth * 0.089)
+        height = int(self.WindowHeight * 0.08)
+        return (left, top, width, height)
+    
+    # 底牌封面
+    def getThreeCardFrontCoverPos(self):
+        left = int(self.WindowWidth * 0.42)
+        top = int(self.WindowHeight * 0.035)
+        width = int(self.WindowWidth * 0.065)
+        height = int(self.WindowHeight * 0.135)
+        return (left, top, width, height)  
+
     # 3张底牌区域
     def getThreeCardsPos(self):
-        left = int(self.WindowWidth * 0.42)
-        top = int(self.WindowHeight * 0.04)
-        width = self.WindowWidth - int(self.WindowWidth * 0.84)
-        height = int(self.WindowHeight * 0.13)
+        left = int(self.WindowWidth * 0.41)
+        top = int(self.WindowHeight * 0.035)
+        width = self.WindowWidth - int(self.WindowWidth * 0.82)
+        height = int(self.WindowHeight * 0.135)
+        return (left, top, width, height)
+
+    # 左边玩家地主标志
+    def getLeftLandlordFlagPos(self):
+        left = int(self.WindowWidth * 0.075)
+        top = int(self.WindowHeight * 0.272)
+        width = int(self.WindowWidth * 0.06)
+        height = int(self.WindowHeight * 0.125)
+        return (left, top, width, height)
+    
+    # 右边玩家地主标志
+    def getRightLandlordFlagPos(self):
+        left = int(self.WindowWidth * 0.858)
+        top = int(self.WindowHeight * 0.272)
+        width = int(self.WindowWidth * 0.06)
+        height = int(self.WindowHeight * 0.125)
+        return (left, top, width, height)
+    
+    # 我的地主标志
+    def getMyLandlordFlagPos(self):
+        left = int(self.WindowWidth * 0.002)
+        top = int(self.WindowHeight * 0.789)
+        width = int(self.WindowWidth * 0.06)
+        height = int(self.WindowHeight * 0.125)
         return (left, top, width, height)
 
     # 我的手牌区域
@@ -35,12 +75,12 @@ class ScreenHelper:
         height = self.WindowHeight - top - int(self.WindowHeight * 0.1)
         return (left, top, width, height)
 
-    # 我的出牌区域
-    def getMyPlayedCardsPos(self):
-        left = int(self.WindowWidth * 0.3)
-        top = int(self.WindowHeight * 0.5)
-        width = self.WindowWidth - int(self.WindowWidth * 0.6)
-        height = self.WindowHeight - top - int(self.WindowHeight * 0.3)
+    # 右边玩家出牌区域
+    def getRightPlayedCardsPos(self):
+        left = int(self.WindowWidth * 0.5)
+        top = int(self.WindowHeight * 0.33)
+        width = self.WindowWidth - left - int(self.WindowWidth * 0.22)
+        height = self.WindowHeight - top - int(self.WindowHeight * 0.47)
         return (left, top, width, height)
 
     # 左边玩家出牌区域
@@ -51,12 +91,20 @@ class ScreenHelper:
         height = self.WindowHeight - top - int(self.WindowHeight * 0.47)
         return (left, top, width, height)
     
-    # 右边玩家出牌区域
-    def getRightPlayedCardsPos(self):
-        left = int(self.WindowWidth * 0.5)
-        top = int(self.WindowHeight * 0.33)
-        width = self.WindowWidth - left - int(self.WindowWidth * 0.22)
-        height = self.WindowHeight - top - int(self.WindowHeight * 0.47)
+    # 我的出牌区域
+    def getMyPlayedCardsPos(self):
+        left = int(self.WindowWidth * 0.3)
+        top = int(self.WindowHeight * 0.5)
+        width = self.WindowWidth - int(self.WindowWidth * 0.6)
+        height = self.WindowHeight - top - int(self.WindowHeight * 0.3)
+        return (left, top, width, height)
+
+    # 对局结束输赢数量区域
+    def getWinOrLoseBeansPos(self):
+        left = int(self.WindowWidth * 0.749)
+        top = int(self.WindowHeight * 0.27)
+        width = int(self.WindowWidth * 0.194)
+        height = int(self.WindowHeight * 0.07)
         return (left, top, width, height)
 
     # 我的 -> 不要
@@ -123,30 +171,6 @@ class ScreenHelper:
         height = int(self.WindowHeight * 0.1)
         return (left, top, width, height)
 
-    # 左边玩家地主标志
-    def getLeftLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.082)
-        top = int(self.WindowHeight * 0.288)
-        width = int(self.WindowWidth * 0.042)
-        height = int(self.WindowHeight * 0.08)
-        return (left, top, width, height)
-    
-    # 右边玩家地主标志
-    def getRightLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.862)
-        top = int(self.WindowHeight * 0.288)
-        width = int(self.WindowWidth * 0.042)
-        height = int(self.WindowHeight * 0.08)
-        return (left, top, width, height)
-    
-    # 我的地主标志
-    def getMyLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.005)
-        top = int(self.WindowHeight * 0.781)
-        width = int(self.WindowWidth * 0.042)
-        height = int(self.WindowHeight * 0.08)
-        return (left, top, width, height)
-
     # 左边玩家剩余牌数
     def getLeftCardsNumPos(self):
         left = int(self.WindowWidth * 0.19)
@@ -163,22 +187,6 @@ class ScreenHelper:
         height = int(self.WindowHeight * 0.06)
         return (left, top, width, height)
 
-    # 聊天按钮
-    def getChatBtnPos(self):
-        left = int(self.WindowWidth * 0.915)
-        top = int(self.WindowHeight * 0.935)
-        width = int(self.WindowWidth * 0.079)
-        height = int(self.WindowHeight * 0.07)
-        return (left, top, width, height)
-    
-    # 底牌封面
-    def getThreeCardFrontCoverPos(self):
-        left = int(self.WindowWidth * 0.42)
-        top = int(self.WindowHeight * 0.045)
-        width = int(self.WindowWidth * 0.06)
-        height = int(self.WindowHeight * 0.12)
-        return (left, top, width, height)
-    
     # 快速开始按钮
     def getQuickStartBtnPos(self):
         left = int(self.WindowWidth * 0.792)

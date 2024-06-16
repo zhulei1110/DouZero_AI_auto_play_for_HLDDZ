@@ -31,8 +31,8 @@ Bombs = [[3, 3, 3, 3],
          [20, 30]]
 
 class Worker(QThread):
-    auto_start = pyqtSignal(int)
-    manual_start = pyqtSignal(int)
+    # auto_start = pyqtSignal(int)
+    # manual_start = pyqtSignal(int)
     stop = pyqtSignal(int)
 
     def __init__(self):
@@ -40,15 +40,13 @@ class Worker(QThread):
         self.gameHelper = GameHelper()
         self.imageLocator = ImageLocator()
         self.screenHelper = ScreenHelper()
-        self.auto_sign = None
-        self.loop_sign = None
-        self.landlord_confirmed = None
-        self.data_initializing = None   # 是否正在初始化数据（执行 initial_data 函数）
-        self.data_initialized = None
-        self.in_game_screen = None      # 是否在开始游戏界面内
-        self.game_started = None        # 游戏是否已开始
-        self.game_running = None        # 是否正在进行对弈
-        self.game_over = None
+        self.auto_running = False
+        self.in_game_screen = False      # 是否在开始游戏界面内
+        self.landlord_confirmed = False  # 是否已确认地主
+        self.data_initializing = False   # 是否正在初始化数据（执行 initial_data 函数）
+        self.data_initialized = False
+        self.game_started = False        # 游戏是否已开始
+        self.game_running = False        # 是否正在进行对弈
         self.my_position_code = None
         self.my_position = None
         self.three_cards = None
@@ -61,46 +59,51 @@ class Worker(QThread):
         self.all_player_card_data = None
 
     def run(self):
+        # 第一次截图，用于获取窗口宽高等数据
         self.screenHelper.getScreenshot()
 
-        if self.auto_sign:
+        # 用于测试
+        # self.gameHelper.findMyHandCards()
+
+        if self.auto_running:
             print("现在是自动模式...")
         else:
             print("现在是手动模式...")
 
-        self.loop_sign = True
-        self.landlord_confirmed = False
-
+        # # 检测是否开局
         while not self.game_started:
             self.before_start()
-            time.sleep(0.25)
+            time.sleep(0.2)
 
+        # 确认地主之后，初始化数据
         while self.landlord_confirmed:
-            if self.data_initializing:
+            # 如果 正在初始化中 或 已初始化完成，就直接 continue 跳过本次循环
+            if self.data_initializing or self.data_initialized:
                 continue
-
-            if not self.data_initialized:
-                self.initial_data()
-                self.data_initializing = False
-                self.data_initialized = True
-
+            self.initial_data()
+            self.data_initialized = True
             time.sleep(0.2)
         
+        # 初始化数据之后，开始对局
         while self.data_initialized:
             if self.game_running:
                 break
-            
-            self.start_game()
+            self.run_game()
+            time.sleep(0.2)
+
+        # 开始对局之后，检测对局是否结束
+        while self.game_running:
+            self.check_if_game_overed()
+            time.sleep(0.5)
 
     def before_start(self):
         self.in_game_screen = False
         self.in_game_screen = self.check_if_in_game_screen()
         while self.in_game_screen == False:
-            time.sleep(1)
             print("未进入开始游戏界面")
             self.in_game_screen = self.check_if_in_game_screen()
+            time.sleep(0.5)
 
-        time.sleep(0.3)
         if self.in_game_screen and not self.game_started:
             print("已进入开始游戏界面")
 
@@ -109,13 +112,13 @@ class Worker(QThread):
                 print("对局未开始")
 
             while game_started == False:
-                time.sleep(0.5)
                 print("等待对局开始...")
                 game_started = self.check_if_game_started()
+                time.sleep(0.5)
         
-        print("对局开始...")
+        print("对局已开始")
         self.game_started = True
-        self.getThreeCards()    # 对局开始后，获取三张底牌，用于判断是否已确认地主
+        self.getThreeCards()
 
     def check_if_in_game_screen(self):
         region = self.screenHelper.getChatBtnPos()
@@ -128,6 +131,21 @@ class Worker(QThread):
         result = self.imageLocator.LocateOnScreen("three_card_front_cover", region) # OK
         game_started = result is not None
         return game_started
+
+    def check_if_game_overed(self):
+        region = self.screenHelper.getWinOrLoseBeansPos()
+        win = self.imageLocator.LocateOnScreen("beans_win", region)
+        lose = self.imageLocator.LocateOnScreen("beans_lose", region)
+        if win is not None or lose is not None:
+            self.resetStatus()
+            # 通知 AI 结果
+
+    def resetStatus(self):
+        self.landlord_confirmed = False
+        self.data_initializing = False
+        self.data_initialized = False
+        self.game_started = False
+        self.game_running = False
 
     def initial_data(self):
         self.data_initializing = True
@@ -151,47 +169,12 @@ class Worker(QThread):
                 self.other_player_hand_cards[0:17] if (self.my_position_code + 1) % 3 == 1 else self.other_player_hand_cards[17:]
         })
 
-        print("开始对局...")
-
         # 出牌顺序：0-我出牌, 1-我的下家出牌, 2-我的上家出牌
         self.play_order = 0 if self.my_position == "landlord" else 1 if self.my_position == "landlord_up" else 2
+        print('play_order: ', self.play_order)
 
-    # 获取其它玩家的手牌
-    def getOtherPlayerHandCards(self):
-        self.other_player_hand_cards = []
-        self.all_player_card_data = {}
-
-        for i in set(AllEnvCard):
-            # 对于每一张牌（i），计算它在整副牌 AllEnvCard 中出现的次数，减去玩家手牌中该牌出现的次数，即为其他玩家手牌中该牌的数量
-            self.other_player_hand_cards.extend([i] * (AllEnvCard.count(i) - self.my_hand_cards_env.count(i)))
-
-        # 将 self.other_player_hand_cards 中的 env牌编码转换为实际的牌面字符，并将它们组合成一个字符串，最后将其反转
-        self.other_hands_cards_str = str(''.join([EnvCard2RealCard[c] for c in self.other_player_hand_cards]))[::-1]
-
-    # 获取我的手牌
-    def getMyHandCards(self):
-        print("正在识别我的手牌...")
-        self.my_hand_cards = self.gameHelper.findMyHandCards()
-        if self.my_position_code == 1:
-            while len(self.my_hand_cards) != 20:
-                if not self.game_started:
-                    continue
-
-                self.my_hand_cards = self.gameHelper.findMyHandCards()
-                time.sleep(0.2)
-
-            self.my_hand_cards_env = [RealCard2EnvCard[c] for c in list(self.my_hand_cards)]
-        else:
-            while len(self.my_hand_cards) != 17:
-                if not self.game_started:
-                    continue
-
-                self.my_hand_cards = self.gameHelper.findMyHandCards()
-                time.sleep(0.2)
-
-            self.my_hand_cards_env = [RealCard2EnvCard[c] for c in list(self.my_hand_cards)]
-
-        print("我的手牌：", self.my_hand_cards)
+        self.data_initializing = False
+        print("已完成卡牌数据初始化")
 
     # 获取三张底牌
     def getThreeCards(self):
@@ -203,7 +186,7 @@ class Worker(QThread):
             self.three_cards = self.gameHelper.findThreeCards()
             time.sleep(0.2)
         
-        self.landlord_confirmed = True
+        self.landlord_confirmed = True      # 成功获取三张底牌，意味着地主已确定 
         self.three_cards_env = [RealCard2EnvCard[c] for c in list(self.three_cards)]
         print("三张底牌：", self.three_cards)
 
@@ -222,9 +205,8 @@ class Worker(QThread):
 
     # 玩家角色：0-地主上家, 1-地主, 2-地主下家
     def findMyPostion(self):
-        rightLandlordHatRegion = self.screenHelper.getLeftLandlordFlagPos()
-        testImage = Image.open('test123.png')
-        result1 = self.imageLocator.LocateOnScreen("landlord_hat", rightLandlordHatRegion, img=testImage)
+        rightLandlordHatRegion = self.screenHelper.getRightLandlordFlagPos()
+        result1 = self.imageLocator.LocateOnScreen("landlord_hat", rightLandlordHatRegion)
         if result1 is not None:
             return 0 # 如果右边是地主，我就是地主上家
 
@@ -238,15 +220,62 @@ class Worker(QThread):
         if result3 is not None:
             return 1
 
-    def start_game(self):
-        self.game_running = True
-        return False
+    # 获取我的手牌
+    def getMyHandCards(self):
+        print("正在识别我的手牌...")
+        success = False
+        self.my_hand_cards = self.gameHelper.findMyHandCards()
+        if self.my_position_code == 1:
+            while len(self.my_hand_cards) != 20 and not success:
+                self.my_hand_cards = self.gameHelper.findMyHandCards()
+                success = len(self.my_hand_cards) == 20
+                time.sleep(0.2)
 
-    def auto_operate(self):
-        self.check_if_game_is_over()
-        if self.auto_sign:
+            self.my_hand_cards_env = [RealCard2EnvCard[c] for c in list(self.my_hand_cards)]
+        else:
+            while len(self.my_hand_cards) != 17 and not success:
+                self.my_hand_cards = self.gameHelper.findMyHandCards()
+                success = len(self.my_hand_cards) == 17
+                time.sleep(0.2)
+
+            self.my_hand_cards_env = [RealCard2EnvCard[c] for c in list(self.my_hand_cards)]
+
+        print("我的手牌：", self.my_hand_cards)
+
+    # 其它玩家的手牌
+    def getOtherPlayerHandCards(self):
+        self.other_player_hand_cards = []
+        self.all_player_card_data = {}
+
+        for i in set(AllEnvCard):
+            # 对于每一张牌（i），计算它在整副牌 AllEnvCard 中出现的次数，减去玩家手牌中该牌出现的次数，即为其他玩家手牌中该牌的数量
+            self.other_player_hand_cards.extend([i] * (AllEnvCard.count(i) - self.my_hand_cards_env.count(i)))
+
+        # 将 self.other_player_hand_cards 中的 env牌编码转换为实际的牌面字符，并将它们组合成一个字符串，最后将其反转
+        self.other_hands_cards_str = str(''.join([EnvCard2RealCard[c] for c in self.other_player_hand_cards]))[::-1]
+
+    def run_game(self):
+        print("开始出牌...")
+        self.game_running = True
+
+        while self.game_running:
+            rightPlayedCards = self.gameHelper.findRightPlayedCards()
+            if rightPlayedCards is not None:
+                print("右侧玩家出牌：", rightPlayedCards)
+
+            leftPlayedCards = self.gameHelper.findLeftPlayedCards()
+            if leftPlayedCards is not None:
+                print("左侧玩家出牌：", leftPlayedCards)
+
+            myPlayedCards = self.gameHelper.findMyPlayedCards()
+            if myPlayedCards is not None:
+                print("我的出牌：", myPlayedCards)
+
+            time.sleep(0.2)
+
+    def auto_operation(self):
+        if self.auto_running:
             self.detect_and_click_continue_game_btn()
-            # self.check_if_game_results()
             self.detect_and_click_quick_start_btn()
             self.detect_and_click_start_btn()
         else:
@@ -258,7 +287,7 @@ class Worker(QThread):
         if result is not None:
             # self.gameHelper.ClickOnImage("quick_start_btn", region)
             print('模拟点击 ·快速开始· 按钮')
-            time.sleep(1)
+            # time.sleep(1)
     
     def detect_and_click_start_btn(self):
         region = self.screenHelper.getStartGameBtnPos()
@@ -266,41 +295,15 @@ class Worker(QThread):
         if result is not None:
             # self.gameHelper.ClickOnImage("start_game_btn", region)
             print('模拟点击 ·开始游戏· 按钮')
-            time.sleep(1)
+            # time.sleep(1)
 
     def detect_and_click_continue_game_btn(self):
         region = self.screenHelper.getContinueGameBtnPos()
         result = self.imageLocator.LocateOnScreen("continue_game_btn", region) # OK
         if result is not None:
-            if not self.loop_sign:
-                print("对局已结束")
-            else:
-                self.game_started = False
-                # 通知 AI 结果
-                # self.gameHelper.ClickOnImage("continue_game_btn", region)
-                print('模拟点击 ·继续游戏· 按钮')
- 
-    def check_if_game_is_over(self):
-        beansRegions = self.screenHelper.getBeansRegionsPos() # 这个方式不太稳妥，页面显示的时候过短，有可能识别不到
-        for i in beansRegions:
-            result = self.imageLocator.LocateOnScreen("beans", region=i)
-            if result is not None:
-                print("对局已结束")
-                self.game_started = False
-                time.sleep(3)
-                break
-
-    def check_if_game_results(self):
-        loseRegion = self.screenHelper.getLoseTextPos()
-        winRegion = self.screenHelper.getWinTextPos()
-        lose = self.imageLocator.LocateOnScreen("lose", loseRegion)
-        win = self.imageLocator.LocateOnScreen("win", winRegion)
-        if win is not None or lose is not None:
-            if not self.loop_sign:
-                print("对局已结束")
-            else:
-                self.game_started = False
-                # 通知 AI 结果
-                time.sleep(1)
+            self.game_started = False
+            # 通知 AI 结果
+            # self.gameHelper.ClickOnImage("continue_game_btn", region)
+            print('模拟点击 ·继续游戏· 按钮')
 
         
