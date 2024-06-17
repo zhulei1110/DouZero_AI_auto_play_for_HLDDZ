@@ -1,4 +1,5 @@
 import time
+import threading
 from PIL import Image
 from PyQt5.QtCore import pyqtSignal, QThread
 
@@ -57,6 +58,9 @@ class Worker(QThread):
         self.other_player_hand_cards = None     # 其他玩家的手牌（整副牌减去我的手牌，后续再减掉历史出牌）
         self.other_player_hands_cards_str = None
         self.all_player_card_data = None
+        self.my_done = threading.Event()
+        self.right_done = threading.Event()
+        self.left_done = threading.Event()
 
     def run(self):
         # 第一次截图，用于获取窗口宽高等数据
@@ -166,29 +170,31 @@ class Worker(QThread):
         print('----- 准备就绪，开始出牌 -----')
         self.game_running = True
 
+        # 启动线程执行每个玩家出牌的逻辑
+        thread_right = threading.Thread(target=self.get_right_played_cards)
+        thread_left = threading.Thread(target=self.get_left_played_cards)
+        thread_my = threading.Thread(target=self.get_my_played_cards)
+
+        thread_right.start()
+        thread_left.start()
+        thread_my.start()
+
+        if self.play_order == 0:        # 顺序：我 --> 右边玩家 --> 左边玩家
+            self.my_done.set()
+        elif self.play_order == 1:      # 顺序：右边玩家 --> 左边玩家 --> 我
+            self.right_done.set()
+        elif self.play_order == 2:      # 顺序：左边玩家 --> 我 --> 右边玩家
+            self.left_done.set()
+
         while self.game_running:
-            if self.play_order == 0:        # 我先出牌
-                print()
-            elif self.play_order == 1:      # 下家先出牌
-                print()
-            elif self.play_order == 1:      # 上家先出牌
-                print()
-            
-            # rightPlayedCards = self.gameHelper.findRightPlayedCards()
-            # if rightPlayedCards is not None:
-            #     print("右侧玩家出牌：", rightPlayedCards)
-
-            # leftPlayedCards = self.gameHelper.findLeftPlayedCards()
-            # if leftPlayedCards is not None:
-            #     print("左侧玩家出牌：", leftPlayedCards)
-
-            # myPlayedCards = self.gameHelper.findMyPlayedCards()
-            # if myPlayedCards is not None:
-            #     print("我的出牌：", myPlayedCards)
-
             print('正在检测对局是否结束...')
             self.check_if_game_overed()
             time.sleep(1)
+        
+        # 等待所有线程完成
+        thread_my.join()
+        thread_right.join()
+        thread_left.join()
 
     def check_if_in_game_screen(self):
         region = self.screenHelper.getChatBtnPos()
@@ -216,7 +222,77 @@ class Worker(QThread):
         self.data_initializing = False
         self.data_initialized = False
         self.game_started = False
+
         self.game_running = False
+        self.my_done.set()
+        self.right_done.set()
+        self.left_done.set()
+
+    def get_right_played_cards(self, first=False):
+        while self.game_running:
+            self.right_done.wait()
+            if not self.game_running:
+                break
+
+            rightBuchu = None
+            rightPlayedCards = None
+
+            if not first:
+                rightBuchu = self.gameHelper.findRightPass()
+            rightPlayedCards = self.gameHelper.findRightPlayedCards()
+
+            if rightBuchu is not None:
+                print("右侧玩家不出牌")
+            
+            if rightPlayedCards is not None and len(rightPlayedCards) > 0:
+                print("右侧玩家出牌：", rightPlayedCards)
+        
+            self.right_done.clear()
+            self.left_done.set()
+    
+    def get_left_played_cards(self, first=False):
+        while self.game_running:
+            self.left_done.wait()
+            if not self.game_running:
+                break
+
+            leftBuchu = None
+            leftPlayedCards = None
+            
+            if not first:
+                leftBuchu = self.gameHelper.findLeftPass()
+            leftPlayedCards = self.gameHelper.findLeftPlayedCards()
+
+            if leftBuchu is not None:
+                print("左侧玩家不出牌")
+            
+            if leftPlayedCards is not None and len(leftPlayedCards) > 0:
+                print("左侧玩家出牌：", leftPlayedCards)
+            
+            self.left_done.clear()
+            self.my_done.set()
+    
+    def get_my_played_cards(self, first=False):
+        while self.game_running:
+            self.my_done.wait()
+            if not self.game_running:
+                break
+
+            myBuchu = None
+            myPlayedCards = None
+            
+            if not first:
+                myBuchu = self.gameHelper.findMyPass()
+            myPlayedCards = self.gameHelper.findMyPlayedCards()
+
+            if myBuchu is not None:
+                print("我不出牌")
+            
+            if myPlayedCards is not None and len(myPlayedCards) > 0:
+                print("我出牌：", myPlayedCards)
+
+            self.my_done.clear()
+            self.right_done.set()
 
     def get_my_position(self):
         print("1.正在识别我的角色...")

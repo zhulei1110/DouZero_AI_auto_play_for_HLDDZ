@@ -143,18 +143,18 @@ class GameHelper:
         scale = self.imageLocator.get_resize_scale(image) * 0.89      # 0.84 ~ 0.93
 
         right_played_cards = self.findCards(image, rightPlayedCardsPos, mark='playedCards', scale=scale)
+        # print('right_played_cards:', right_played_cards)
         return right_played_cards
     
     def findLeftPlayedCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
-        # screenshot = Image.open('screenshots/test_left_played_cards_for_X.png')
         leftPlayedCardsPos = self.screenHelper.getLeftPlayedCardsPos()
 
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.get_resize_scale(image) * 0.89      # 0.84 ~ 0.93
 
         left_played_cards = self.findCards(image, leftPlayedCardsPos, mark='playedCards', scale=scale)
-        # print(left_played_cards)
+        # print('left_played_cards:', left_played_cards)
         return left_played_cards
     
     def findMyPlayedCards(self):
@@ -166,8 +166,41 @@ class GameHelper:
         scale = self.imageLocator.get_resize_scale(image) * 0.89      # 0.84 ~ 0.93
 
         my_played_cards = self.findCards(image, myPlayedCardsPos, mark='playedCards', scale=scale)
-        # print(my_played_cards)
+        # print('my_played_cards:', my_played_cards)
         return my_played_cards
+
+    def findRightPass(self):
+        screenshot, _ = self.screenHelper.getScreenshot()
+        rightPassPos = self.screenHelper.getRightPassPos()
+
+        image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
+        scale = self.imageLocator.get_resize_scale(image)
+
+        template = self.templateImages['buchu']
+        result = self.imageLocator.locate_first_match_on_image(image, template, region=rightPassPos, scale=scale)
+        return result
+    
+    def findLeftPass(self):
+        screenshot, _ = self.screenHelper.getScreenshot()
+        leftPassPos = self.screenHelper.getLeftPassPos()
+
+        image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
+        scale = self.imageLocator.get_resize_scale(image)
+
+        template = self.templateImages['buchu']
+        result = self.imageLocator.locate_first_match_on_image(image, template, region=leftPassPos, scale=scale)
+        return result
+    
+    def findMyPass(self):
+        screenshot, _ = self.screenHelper.getScreenshot()
+        myPassPos = self.screenHelper.getMyPassPos()
+
+        image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
+        scale = self.imageLocator.get_resize_scale(image)
+
+        template = self.templateImages['buchu']
+        result = self.imageLocator.locate_first_match_on_image(image, template, region=myPassPos, scale=scale)
+        return result
 
     def compare_image(img1, img2):
         # 转换为灰度图
