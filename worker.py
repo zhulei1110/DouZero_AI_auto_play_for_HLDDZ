@@ -192,20 +192,20 @@ class Worker(QThread):
 
     def check_if_in_game_screen(self):
         region = self.screenHelper.getChatBtnPos()
-        result = self.imageLocator.LocateOnScreen("chat_btn", region) # OK
+        result = self.imageLocator.locate_match_on_screen("chat_btn", region) # OK
         in_game_screen = result is not None
         return in_game_screen
     
     def check_if_game_started(self):
         region = self.screenHelper.getThreeCardFrontCoverPos()
-        result = self.imageLocator.LocateOnScreen("three_card_front_cover", region) # OK
+        result = self.imageLocator.locate_match_on_screen("three_card_front_cover", region) # OK
         game_started = result is not None
         return game_started
 
     def check_if_game_overed(self):
         region = self.screenHelper.getWinOrLoseBeansPos()
-        win = self.imageLocator.LocateOnScreen("beans_win", region)
-        lose = self.imageLocator.LocateOnScreen("beans_lose", region)
+        win = self.imageLocator.locate_match_on_screen("beans_win", region)
+        lose = self.imageLocator.locate_match_on_screen("beans_lose", region)
         if win is not None or lose is not None:
             self.reset_status()
             print('对局已结束')
@@ -262,17 +262,17 @@ class Worker(QThread):
     # 玩家角色：0-地主上家, 1-地主, 2-地主下家
     def find_my_postion(self):
         rightLandlordHatRegion = self.screenHelper.getRightLandlordFlagPos()
-        result1 = self.imageLocator.LocateOnScreen("landlord_hat", rightLandlordHatRegion)
+        result1 = self.imageLocator.locate_match_on_screen("landlord_hat", rightLandlordHatRegion)
         if result1 is not None:
             return 0 # 如果右边是地主，我就是地主上家
 
         leftLandlordHatRegion = self.screenHelper.getLeftLandlordFlagPos()
-        result2 = self.imageLocator.LocateOnScreen("landlord_hat", leftLandlordHatRegion)
+        result2 = self.imageLocator.locate_match_on_screen("landlord_hat", leftLandlordHatRegion)
         if result2 is not None:
             return 2 # 如果左边是地主，我就是地主下家
 
         myLandlordHatRegion = self.screenHelper.getMyLandlordFlagPos()
-        result3 = self.imageLocator.LocateOnScreen("landlord_hat", myLandlordHatRegion)
+        result3 = self.imageLocator.locate_match_on_screen("landlord_hat", myLandlordHatRegion)
         if result3 is not None:
             return 1
 
@@ -286,7 +286,7 @@ class Worker(QThread):
 
     def detect_and_click_quick_start_btn(self):
         region = self.screenHelper.getQuickStartBtnPos()
-        result = self.imageLocator.LocateOnScreen("quick_start_btn", region) # OK
+        result = self.imageLocator.locate_match_on_screen("quick_start_btn", region) # OK
         if result is not None:
             # self.gameHelper.ClickOnImage("quick_start_btn", region)
             print('模拟点击 ·快速开始· 按钮')
@@ -294,7 +294,7 @@ class Worker(QThread):
     
     def detect_and_click_start_btn(self):
         region = self.screenHelper.getStartGameBtnPos()
-        result = self.imageLocator.LocateOnScreen("start_game_btn", region) # OK
+        result = self.imageLocator.locate_match_on_screen("start_game_btn", region) # OK
         if result is not None:
             # self.gameHelper.ClickOnImage("start_game_btn", region)
             print('模拟点击 ·开始游戏· 按钮')
@@ -302,7 +302,7 @@ class Worker(QThread):
 
     def detect_and_click_continue_game_btn(self):
         region = self.screenHelper.getContinueGameBtnPos()
-        result = self.imageLocator.LocateOnScreen("continue_game_btn", region) # OK
+        result = self.imageLocator.locate_match_on_screen("continue_game_btn", region) # OK
         if result is not None:
             self.game_started = False
             # 通知 AI 结果

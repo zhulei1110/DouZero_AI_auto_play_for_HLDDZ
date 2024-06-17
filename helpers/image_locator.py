@@ -16,7 +16,7 @@ class ImageLocator:
 
         # print('self.templateImages: ', self.templateImages)
 
-    def getResizeScale(self, image=None):
+    def get_resize_scale(self, image=None):
         if image is None:
             screenshot, _ = self.screenHelper.getScreenshot()
             image = np.asarray(screenshot)
@@ -28,9 +28,9 @@ class ImageLocator:
         return scale
 
     # 查找所有匹配位置，返回所有坐标的列表
-    def LocateAllOnImage(self, image, template, region=None, scale=None, confidence=0.8):
+    def locate_all_match_on_image(self, image, template, region=None, scale=None, confidence=0.8):
         if scale is None:
-            scale = self.getResizeScale(image)
+            scale = self.get_resize_scale(image)
 
         if region is not None:
             x, y, w, h = region
@@ -67,9 +67,9 @@ class ImageLocator:
         return points
 
     # 只查找第一个匹配位置，返回单个坐标或 None
-    def LocateOnImage(self, image, template, region=None, scale=None, confidence=0.8):
+    def locate_first_match_on_image(self, image, template, region=None, scale=None, confidence=0.8):
         if scale is None:
-            scale = self.getResizeScale(image)
+            scale = self.get_resize_scale(image)
 
         if region is not None:
             x, y, w, h = region
@@ -100,7 +100,7 @@ class ImageLocator:
         else:
             return None
 
-    def LocateOnScreen(self, templateName, region, scale=None, confidence=0.8, image=None):
+    def locate_match_on_screen(self, templateName, region, scale=None, confidence=0.8, image=None):
         if image is not None:
             screenshot = image
         else:
@@ -112,5 +112,5 @@ class ImageLocator:
         imgcv = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
 
         # 调用 LocateOnImage 函数在图像中查找模板图像的位置
-        result = self.LocateOnImage(image=imgcv, template=self.templateImages[templateName], region=region, scale=scale, confidence=confidence)
+        result = self.locate_first_match_on_image(image=imgcv, template=self.templateImages[templateName], region=region, scale=scale, confidence=confidence)
         return result

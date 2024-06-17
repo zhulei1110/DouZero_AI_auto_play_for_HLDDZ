@@ -114,11 +114,8 @@ class ColorClassifier(object):
     
 if __name__ == "__main__":
     classifier = ColorClassifier(debug=True)
-    image = cv2.imread("images/my-A.png", cv2.IMREAD_UNCHANGED)
-
+    image = cv2.imread("images/D.png", cv2.IMREAD_UNCHANGED)
     result = classifier.classify(image)
-    print(result)
-
     for cls, score in result:
         print(cls, score)
         if cls == "Red":
