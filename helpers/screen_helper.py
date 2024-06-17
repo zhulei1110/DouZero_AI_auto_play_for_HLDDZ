@@ -9,8 +9,8 @@ from config import Config
 
 class ScreenHelper:
     def __init__(self):
-        self.ScreenZoomRate = None
         self.config = Config.load()
+        self.ScreenZoomRate = None
         self.Handle = win32gui.FindWindow(self.config.window_class_name, None)
         self.WindowWidth = self.config.window_width
         self.WindowHeight = self.config.window_height
@@ -291,18 +291,13 @@ class ScreenHelper:
                     self.WindowHeight = captureHeight
                     image, result = self.captureScreenshot(gameWindow, captureWidth, captureHeight)
                 
-                print('captureScreenshot image: ', image)
-                # print('captureScreenshot result: ', result)
+                # print('Screenshot captured successfully: ', image)
 
                 if image is None:
                     raise Exception("getScreenshot failed")
-                
-                # image.save('screenshot.png')
-                # image = image.resize((self.WindowWidth, self.WindowHeight))
-                
+
                 if region is not None:
                     image = image.crop((region[0], region[1], region[0] + region[2], region[1] + region[3]))
-                    # image('screenshot_region.png')
 
                 if result:
                     success = True

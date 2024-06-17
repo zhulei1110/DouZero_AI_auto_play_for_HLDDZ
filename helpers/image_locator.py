@@ -35,14 +35,17 @@ class ImageLocator:
         if region is not None:
             x, y, w, h = region
             image = image[y:y + h, x:x + w]
+
+            # 图片日志
             filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
-            cv2.imwrite(f'logs/{filename}_screenshot.png', image)
+            cv2.imwrite(f'logs/LocateAllOnImage_{filename}.png', image)
 
         image_w, image_h = image.shape[1], image.shape[0]
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
+        # 图片日志
         scaleText = f"{scale:.{4}f}".replace('.', '-')
-        cv2.imwrite(f'logs/{filename}_template_scale_{scaleText}.png', template)
+        cv2.imwrite(f'logs/LocateAllOnImage_{filename}_template_{scaleText}.png', template)
 
         # 使用 OpenCV 的 matchTemplate 函数在 image 中搜索 template
         # cv2.TM_CCOEFF_NORMED 是一种匹配方法，返回一个结果矩阵 res，其中每个值表示模板与图像对应位置的匹配程度
@@ -50,6 +53,7 @@ class ImageLocator:
 
         # 找出结果矩阵中所有大于等于 confidence 的位置，表示这些位置的模板匹配度高于或等于置信度阈值
         loc = np.where(res >= confidence)
+        # print('loc: ', loc)
 
         # 创建一个空列表 points 用于存储匹配位置
         points = []
@@ -70,12 +74,16 @@ class ImageLocator:
         if region is not None:
             x, y, w, h = region
             image = image[y:y + h, x:x + w, :]
+
+            # 图片日志
             filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
-            cv2.imwrite(f'logs/{filename}_screenshot.png', image)
+            cv2.imwrite(f'logs/LocateOnImage_{filename}.png', image)
 
         template = cv2.resize(template, None, fx=scale, fy=scale)
+
+        # 图片日志
         scaleText = f"{scale:.{4}f}".replace('.', '-')
-        cv2.imwrite(f'logs/{filename}_template_scale_{scaleText}.png', template)
+        cv2.imwrite(f'logs/LocateOnImage_{filename}_template_{scaleText}.png', template)
 
         res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
         # print(res)
