@@ -61,6 +61,9 @@ class Worker(QThread):
         self.my_done = threading.Event()
         self.right_done = threading.Event()
         self.left_done = threading.Event()
+        self.my_play_completed = False
+        self.right_play_completed = False
+        self.left_play_completed = False
 
     def run(self):
         # 第一次截图，用于获取窗口宽高等数据
@@ -96,7 +99,7 @@ class Worker(QThread):
             time.sleep(0.5)
 
     def before_start(self):
-        print('----- 开始检测是否开局 -----')
+        print('开始检测是否开局...')
         self.in_game_screen = self.check_if_in_game_screen()
         while not self.in_game_screen:
             print("未进入开始游戏界面")
@@ -111,18 +114,18 @@ class Worker(QThread):
                 print("对局尚未开始")
 
             while not game_started:
-                print("等待对局开始...")
+                print("等待手动开始游戏...")
                 game_started = self.check_if_game_started()
                 time.sleep(1)
         
         if game_started:
-            print("----- 对局已开始 -----")
+            print("对局已开始")
             print()
             self.game_started = True
             self.get_three_cards()
 
     def get_three_cards(self):
-        print("----- 正在识别三张底牌 -----")
+        print("正在识别三张底牌...")
         while self.three_cards is None or len(self.three_cards) != 3:
             self.three_cards = self.gameHelper.findThreeCards()
             time.sleep(0.5)
@@ -130,16 +133,16 @@ class Worker(QThread):
         # 成功获取到三张底牌，意味着地主已确定 
         self.landlord_confirmed = True
         self.three_cards_env = [RealCard2EnvCard[c] for c in list(self.three_cards)]
-        print(f"----- 三张底牌：{self.three_cards}----- ")
+        print(f"三张底牌：{self.three_cards}")
 
     def initial_data(self):
-        print('----- 开始初始化数据 -----')
+        print('开始初始化数据...')
         self.data_initializing = True
 
         self.get_my_position()
         self.get_my_hand_cards()
 
-        print("3.正在准备本次牌局其它数据...")
+        print("正在准备本次牌局的其它数据...")
         self.get_other_player_hand_cards()
 
         # 这里将牌局的相关数据更新到 self.all_player_card_data 中，包括底牌和每个角色的手牌
@@ -159,18 +162,17 @@ class Worker(QThread):
         # 出牌顺序：0-我先出牌, 1-下家先出牌, 2-上家先出牌
         self.play_order = 0 if self.my_position == "landlord" else 1 if self.my_position == "landlord_up" else 2
         playOrderDescMap = ['我先出牌', '下家先出牌', '上家先出牌']
-        print('4.出牌顺序: ', playOrderDescMap[self.play_order])
+        print('出牌顺序: ', playOrderDescMap[self.play_order])
 
-        print("----- 数据初始化已完成 -----")
+        print("数据初始化已完成")
         print()
         self.data_initialized = True
         self.data_initializing = False
 
     def run_game(self):
-        print('----- 准备就绪，开始出牌 -----')
+        print('准备就绪，开始出牌')
         self.game_running = True
 
-        # 启动线程执行每个玩家出牌的逻辑
         thread_right = threading.Thread(target=self.get_right_played_cards)
         thread_left = threading.Thread(target=self.get_left_played_cards)
         thread_my = threading.Thread(target=self.get_my_played_cards)
@@ -187,9 +189,9 @@ class Worker(QThread):
             self.left_done.set()
 
         while self.game_running:
-            print('正在检测对局是否结束...')
+            # print('正在检测对局是否结束...')
             self.check_if_game_overed()
-            time.sleep(1)
+            time.sleep(2)
         
         # 等待所有线程完成
         thread_my.join()
@@ -214,7 +216,7 @@ class Worker(QThread):
         lose = self.imageLocator.locate_match_on_screen("beans_lose", region)
         if win is not None or lose is not None:
             self.reset_status()
-            print('对局已结束')
+            print('本轮对局已结束')
             # 通知 AI 结果
 
     def reset_status(self):
@@ -234,43 +236,75 @@ class Worker(QThread):
             if not self.game_running:
                 break
 
+            if self.right_play_completed:
+                continue
+
+            rightAnimation1Pos = self.screenHelper.getRightAnimation1Pos()
+            rightAnimation2Pos = self.screenHelper.getRightAnimation2Pos()
+            haveAnimation = self.gameHelper.have_animation(regions=[rightAnimation1Pos, rightAnimation2Pos])
+            if haveAnimation:
+                print('等待动画过去')
+                time.sleep(0.2)
+
             rightBuchu = None
             rightPlayedCards = None
 
             if not first:
-                rightBuchu = self.gameHelper.findRightPass()
+                rightBuchu = self.gameHelper.findRightBuchu()
             rightPlayedCards = self.gameHelper.findRightPlayedCards()
 
             if rightBuchu is not None:
-                print("右侧玩家不出牌")
+                time.sleep(0.5)
+                print("右侧玩家 >>> 不出牌")
             
-            if rightPlayedCards is not None and len(rightPlayedCards) > 0:
-                print("右侧玩家出牌：", rightPlayedCards)
+            rightPlayed = rightPlayedCards is not None and len(rightPlayedCards) > 0
+            if rightPlayed:
+                print(f"右侧玩家出牌：{rightPlayedCards}")
         
-            self.right_done.clear()
-            self.left_done.set()
-    
+            if rightBuchu is not None or rightPlayed:
+                self.right_play_completed = True
+                self.left_play_completed = False
+                # self.my_play_completed = False
+                self.right_done.clear()
+                self.left_done.set()
+
     def get_left_played_cards(self, first=False):
         while self.game_running:
             self.left_done.wait()
             if not self.game_running:
                 break
 
+            if self.left_play_completed:
+                continue
+
+            leftAnimation1Pos = self.screenHelper.getLeftAnimation1Pos()
+            leftAnimation2Pos = self.screenHelper.getLeftAnimation2Pos()
+            haveAnimation = self.gameHelper.have_animation(regions=[leftAnimation1Pos, leftAnimation2Pos])
+            if haveAnimation:
+                print('等待动画过去')
+                time.sleep(0.2)
+
             leftBuchu = None
             leftPlayedCards = None
             
             if not first:
-                leftBuchu = self.gameHelper.findLeftPass()
+                leftBuchu = self.gameHelper.findLeftBuchu()
             leftPlayedCards = self.gameHelper.findLeftPlayedCards()
 
             if leftBuchu is not None:
-                print("左侧玩家不出牌")
+                time.sleep(0.5)
+                print("左侧玩家 >>> 不出牌")
             
-            if leftPlayedCards is not None and len(leftPlayedCards) > 0:
-                print("左侧玩家出牌：", leftPlayedCards)
+            leftPlayed = leftPlayedCards is not None and len(leftPlayedCards) > 0
+            if leftPlayed:
+                print(f"左侧玩家出牌：{leftPlayedCards}")
             
-            self.left_done.clear()
-            self.my_done.set()
+            if leftBuchu is not None or leftPlayed:
+                self.left_play_completed = True
+                self.my_play_completed = False
+                # self.right_play_completed = False
+                self.left_done.clear()
+                self.my_done.set()
     
     def get_my_played_cards(self, first=False):
         while self.game_running:
@@ -278,33 +312,48 @@ class Worker(QThread):
             if not self.game_running:
                 break
 
+            if self.my_play_completed:
+                continue
+
+            myAnimationPos = self.screenHelper.getMyPlayedAnimationPos()
+            haveAnimation = self.gameHelper.have_animation(regions=[myAnimationPos])
+            if haveAnimation:
+                print('等待动画过去')
+                time.sleep(0.2)
+
             myBuchu = None
             myPlayedCards = None
             
             if not first:
-                myBuchu = self.gameHelper.findMyPass()
+                myBuchu = self.gameHelper.findMyBuchu()
             myPlayedCards = self.gameHelper.findMyPlayedCards()
 
             if myBuchu is not None:
-                print("我不出牌")
+                time.sleep(0.5)
+                print("我 >>> 不出牌")
             
-            if myPlayedCards is not None and len(myPlayedCards) > 0:
-                print("我出牌：", myPlayedCards)
+            myPlayed = myPlayedCards is not None and len(myPlayedCards) > 0
+            if myPlayed:
+                print(f"我出牌：{myPlayedCards}")
 
-            self.my_done.clear()
-            self.right_done.set()
+            if (myBuchu is not None) or myPlayed:
+                self.my_play_completed = True
+                self.right_play_completed = False
+                # self.left_play_completed = False
+                self.my_done.clear()
+                self.right_done.set()
 
     def get_my_position(self):
-        print("1.正在识别我的角色...")
+        print("正在识别我的角色...")
         while self.my_position_code is None:
             self.my_position_code = self.find_my_postion()
             time.sleep(0.2)
 
         self.my_position = PlayerPosition[self.my_position_code]
-        print("  我的角色：", self.my_position)
+        print("我的角色：", self.my_position)
 
     def get_my_hand_cards(self):
-        print("2.正在识别我的手牌...")
+        print("正在识别我的手牌...")
         success = False
         self.my_hand_cards = self.gameHelper.findMyHandCards()
         if self.my_position_code == 1:
@@ -322,7 +371,7 @@ class Worker(QThread):
 
             self.my_hand_cards_env = [RealCard2EnvCard[c] for c in list(self.my_hand_cards)]
 
-        print("  我的手牌：", self.my_hand_cards)
+        print("我的手牌：", self.my_hand_cards)
 
     def get_other_player_hand_cards(self):
         self.other_player_hand_cards = []

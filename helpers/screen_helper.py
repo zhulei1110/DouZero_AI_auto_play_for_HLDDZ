@@ -171,6 +171,41 @@ class ScreenHelper:
         height = int(self.WindowHeight * 0.08)
         return (left, top, width, height)
 
+    def getRightAnimation1Pos(self):
+        left = int(self.WindowWidth * 0.86)
+        top = int(self.WindowHeight * 0.19)
+        width = int(self.WindowWidth * 0.0785)
+        height = int(self.WindowHeight * 0.0655)
+        return (left, top, left + width, top + height)
+    
+    def getRightAnimation2Pos(self):
+        left = int(self.WindowWidth * 0.584)
+        top = int(self.WindowHeight * 0.278)
+        width = int(self.WindowWidth * 0.115)
+        height = int(self.WindowHeight * 0.075)
+        return (left, top, left + width, top + height)
+
+    def getLeftAnimation1Pos(self):
+        left = int(self.WindowWidth * 0.06)
+        top = int(self.WindowHeight * 0.19)
+        width = int(self.WindowWidth * 0.0785)
+        height = int(self.WindowHeight * 0.0655)
+        return (left, top, left + width, top + height)
+    
+    def getLeftAnimation2Pos(self):
+        left = int(self.WindowWidth * 0.23)
+        top = int(self.WindowHeight * 0.278)
+        width = int(self.WindowWidth * 0.115)
+        height = int(self.WindowHeight * 0.075)
+        return (left, top, left + width, top + height)
+
+    def getMyPlayedAnimationPos(self):
+        left = int(self.WindowWidth * 0.402)
+        top = int(self.WindowHeight * 0.416)
+        width = int(self.WindowWidth * 0.115)
+        height = int(self.WindowHeight * 0.075)
+        return (left, top, left + width, top + height)
+
     # # 要不起
     # def getPassBtnPos(self):
     #     left = int(self.WindowWidth * 0.48)

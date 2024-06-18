@@ -29,9 +29,14 @@ class ImageLocator:
         scale_h = window_h / float(1080)
         scale = min(scale_w, scale_h)
         return scale
+    
+    def compute_image_unique_key(self, image):
+        image_bytes = image.tobytes()
+        hash_value = hash(image_bytes)
+        return hash_value
 
     # 查找所有匹配位置，返回所有坐标的列表
-    def locate_all_match_on_image(self, image, template, region=None, scale=None, confidence=0.8):
+    def locate_all_match_on_image(self, image, template, templateName=None, region=None, scale=None, confidence=0.8):
         if scale is None:
             scale = self.get_resize_scale(image)
 
@@ -40,15 +45,17 @@ class ImageLocator:
             image = image[y:y + h, x:x + w]
 
             # 图片日志
-            filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
-            cv2.imwrite(f'screenshots/logs/locate_all_match_on_image_{filename}.png', image)
+            # imageKey = self.compute_image_unique_key(image)
+            # regionText = str(region).replace(' ', '').replace(',', '-')
+            # cv2.imwrite(f'screenshots/logs/LAM_{templateName}_{regionText}_{imageKey}.png', image)
 
         image_w, image_h = image.shape[1], image.shape[0]
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
-        scaleText = f"{scale:.{4}f}".replace('.', '-')
-        cv2.imwrite(f'screenshots/logs/locate_all_match_on_image_{filename}_template_{scaleText}.png', template)
+        # templateKey = self.compute_image_unique_key(template)
+        # scaleText = f"{scale:.{4}f}".replace('.', '-')
+        # cv2.imwrite(f'screenshots/logs/LAM_{templateName}_{regionText}_{scaleText}_{templateKey}.png', template)
 
         # 使用 OpenCV 的 matchTemplate 函数在 image 中搜索 template
         # cv2.TM_CCOEFF_NORMED 是一种匹配方法，返回一个结果矩阵 res，其中每个值表示模板与图像对应位置的匹配程度
@@ -70,7 +77,7 @@ class ImageLocator:
         return points
 
     # 只查找第一个匹配位置，返回单个坐标或 None
-    def locate_first_match_on_image(self, image, template, region=None, scale=None, confidence=0.8):
+    def locate_first_match_on_image(self, image, template, templateName=None, region=None, scale=None, confidence=0.8):
         if scale is None:
             scale = self.get_resize_scale(image)
 
@@ -79,14 +86,16 @@ class ImageLocator:
             image = image[y:y + h, x:x + w, :]
 
             # 图片日志
-            filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
-            cv2.imwrite(f'screenshots/logs/locate_first_match_on_image_{filename}.png', image)
+            # imageKey = self.compute_image_unique_key(image)
+            # regionText = str(region).replace(' ', '').replace(',', '-')
+            # cv2.imwrite(f'screenshots/logs/LFM_{templateName}_{regionText}_{imageKey}.png', image)
 
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
-        scaleText = f"{scale:.{4}f}".replace('.', '-')
-        cv2.imwrite(f'screenshots/logs/locate_first_match_on_image_{filename}_template_{scaleText}.png', template)
+        # templateKey = self.compute_image_unique_key(template)
+        # scaleText = f"{scale:.{4}f}".replace('.', '-')
+        # cv2.imwrite(f'screenshots/logs/LFM_{templateName}_{regionText}_{scaleText}_{templateKey}.png', template)
 
         res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
         # print(res)
@@ -115,5 +124,5 @@ class ImageLocator:
         imgcv = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
 
         # 调用 LocateOnImage 函数在图像中查找模板图像的位置
-        result = self.locate_first_match_on_image(image=imgcv, template=self.templateImages[templateName], region=region, scale=scale, confidence=confidence)
+        result = self.locate_first_match_on_image(image=imgcv, template=self.templateImages[templateName], templateName=templateName, region=region, scale=scale, confidence=confidence)
         return result

@@ -53,8 +53,9 @@ class GameHelper:
             scale = self.imageLocator.get_resize_scale(image)
 
         for card in AllCards:
-            template = self.templateImages[f'{mark}_{card}']
-            result = self.imageLocator.locate_all_match_on_image(image, template, region=pos, scale=scale, confidence=confidence)
+            templateName = f'{mark}_{card}'
+            template = self.templateImages[templateName]
+            result = self.imageLocator.locate_all_match_on_image(image, template, templateName=templateName, region=pos, scale=scale, confidence=confidence)
             if len(result) > 0:
                 count, posList = cards_filter(list(result), self.distance)
                 if card == "X" or card == "D":
@@ -80,9 +81,11 @@ class GameHelper:
                         img2 = img1[p[1]:interceptHeight, p[0]:interceptWidth]
 
                         # 图片日志
+                        img1Key = self.imageLocator.compute_image_unique_key(img1)
+                        img2Key = self.imageLocator.compute_image_unique_key(img2)
                         posText = f'{p[1]}-{interceptHeight}_{p[0]}-{interceptWidth}'
-                        cv2.imwrite(f'screenshots/logs/color_classify_{card}.png', img1)
-                        cv2.imwrite(f'screenshots/logs/color_classify_{card}_{posText}.png', img2)
+                        cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}.png', img1)
+                        cv2.imwrite(f'screenshots/logs/cc_{card}_{img2Key}_{posText}.png', img2)
 
                         result = classifier.classify(img2)
                         for r in result:
@@ -144,43 +147,49 @@ class GameHelper:
         # print('my_played_cards:', my_played_cards)
         return my_played_cards
 
-    def findRightPass(self):
+    def findRightBuchu(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         rightPassPos = self.screenHelper.getRightBuchuTextPos()
 
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.get_resize_scale(image)
 
-        template = self.templateImages['buchu']
-        result = self.imageLocator.locate_first_match_on_image(image, template, region=rightPassPos, scale=scale)
+        templateName = 'buchu'
+        template = self.templateImages[templateName]
+        result = self.imageLocator.locate_first_match_on_image(image, template, templateName=templateName, region=rightPassPos, scale=scale)
         return result
     
-    def findLeftPass(self):
+    def findLeftBuchu(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         leftPassPos = self.screenHelper.getLeftBuchuTextPos()
 
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.get_resize_scale(image)
 
-        template = self.templateImages['buchu']
-        result = self.imageLocator.locate_first_match_on_image(image, template, region=leftPassPos, scale=scale)
+        templateName = 'buchu'
+        template = self.templateImages[templateName]
+        result = self.imageLocator.locate_first_match_on_image(image, template, templateName=templateName, region=leftPassPos, scale=scale)
         return result
     
-    def findMyPass(self):
+    def findMyBuchu(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         myPassPos = self.screenHelper.getMyBuchuTextPos()
 
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.get_resize_scale(image)
 
-        template = self.templateImages['buchu']
-        result = self.imageLocator.locate_first_match_on_image(image, template, region=myPassPos, scale=scale)
+        templateName = 'buchu'
+        template = self.templateImages[templateName]
+        result = self.imageLocator.locate_first_match_on_image(image, template, templateName=templateName, region=myPassPos, scale=scale)
         return result
 
-    def compare_image(img1, img2):
+    def compare_image(self, img1, img2):
         # 转换为灰度图
         gray1 = cv2.cvtColor(np.asarray(img1), cv2.COLOR_BGR2GRAY)
         gray2 = cv2.cvtColor(np.asarray(img2), cv2.COLOR_BGR2GRAY)
+
+        # cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray1)}.png', gray1)
+        # cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray2)}.png', gray2)
 
         # 使用结构相似性指数（SSIM）比较相似度
         ssim_index, _ = ssim(gray1, gray2, full=True)
@@ -189,14 +198,14 @@ class GameHelper:
 
         return False
     
-    def have_animation(self, waitingTime=0.1, regions=None):
+    def have_animation(self, screenshotWaitingTime=0.1, regions=None):
         if regions is None:
             return False
         
         image, _ = self.screenHelper.getScreenshot()
         previousImage = image
         for i in range(2):
-            time.sleep(waitingTime)
+            time.sleep(screenshotWaitingTime)
             image, _ = self.screenHelper.getScreenshot()
             for region in regions:
                 if self.compare_image(image.crop(region), previousImage.crop(region)):
@@ -205,10 +214,10 @@ class GameHelper:
 
         return False
 
-if __name__ == "__main__":
-    gameHelper = GameHelper()
-    gameHelper.findThreeCards()
-    gameHelper.findMyHandCards()
-    gameHelper.findRightPlayedCards()
-    gameHelper.findLeftPlayedCards()
-    gameHelper.findMyPlayedCards()
+# if __name__ == "__main__":
+#     gameHelper = GameHelper()
+#     gameHelper.findThreeCards()
+#     gameHelper.findMyHandCards()
+#     gameHelper.findRightPlayedCards()
+#     gameHelper.findLeftPlayedCards()
+#     gameHelper.findMyPlayedCards()
