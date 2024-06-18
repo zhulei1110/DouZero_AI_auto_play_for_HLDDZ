@@ -4,15 +4,18 @@ import os
 
 from helpers.screen_helper import ScreenHelper
 
+dirArr = ["./images/btn/", "./images/other/", "./images/three/", "./images/my/", "./images/play/"]
+
 class ImageLocator:
     def __init__(self):
         self.templateImages = {}
         self.screenHelper = ScreenHelper()
-        for file in os.listdir("./images"):
-            arr = file.split(".")
-            if arr[1] == "png":
-                imgCV = cv2.imread("./images/" + file)
-                self.templateImages.update({arr[0]: imgCV})
+        for dir in dirArr:
+            for file in os.listdir(dir):
+                arr = file.split(".")
+                if arr[1] == "png":
+                    imgCV = cv2.imread(dir + file)
+                    self.templateImages.update({arr[0]: imgCV})
 
         # print('self.templateImages: ', self.templateImages)
 
@@ -38,14 +41,14 @@ class ImageLocator:
 
             # 图片日志
             filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
-            cv2.imwrite(f'logs/LocateAllOnImage_{filename}.png', image)
+            cv2.imwrite(f'screenshots/logs/locate_all_match_on_image_{filename}.png', image)
 
         image_w, image_h = image.shape[1], image.shape[0]
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
         scaleText = f"{scale:.{4}f}".replace('.', '-')
-        cv2.imwrite(f'logs/LocateAllOnImage_{filename}_template_{scaleText}.png', template)
+        cv2.imwrite(f'screenshots/logs/locate_all_match_on_image_{filename}_template_{scaleText}.png', template)
 
         # 使用 OpenCV 的 matchTemplate 函数在 image 中搜索 template
         # cv2.TM_CCOEFF_NORMED 是一种匹配方法，返回一个结果矩阵 res，其中每个值表示模板与图像对应位置的匹配程度
@@ -77,13 +80,13 @@ class ImageLocator:
 
             # 图片日志
             filename = str(region).replace(' ', '').replace('(', '').replace(')', '').replace(',', '-')
-            cv2.imwrite(f'logs/LocateOnImage_{filename}.png', image)
+            cv2.imwrite(f'screenshots/logs/locate_first_match_on_image_{filename}.png', image)
 
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
         scaleText = f"{scale:.{4}f}".replace('.', '-')
-        cv2.imwrite(f'logs/LocateOnImage_{filename}_template_{scaleText}.png', template)
+        cv2.imwrite(f'screenshots/logs/locate_first_match_on_image_{filename}_template_{scaleText}.png', template)
 
         res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
         # print(res)

@@ -41,57 +41,48 @@ class GameHelper:
         self.screenHelper = ScreenHelper()
         self.templateImages = self.imageLocator.templateImages
 
-    def findCards(self, image, pos, mark='my', scale=None, confidence=0.8):
+    def findCards(self, image, pos, mark=None, scale=None, confidence=0.8):
+        if mark is None:
+            return None
+        
         cards = ""
         D_king = 0
         X_king = 0
 
-        for card in AllCards:
-            scaleValue = scale
-            confidenceValue = confidence
-            if card == "X" or card == "D":
-                confidenceValue = 0.73
-                if scale is not None:
-                    if mark == "my":
-                        scaleValue = scale *  0.88
-                    if mark == "myPlayedCards" or mark == "rightPlayedCards" or mark == "leftPlayedCards":
-                        scaleValue = scale *  0.82
-                    if mark == "three":
-                        scaleValue = scale *  0.75
-            
-            # print(f'card:{card}, scale:{scaleValue}, confidence:{confidenceValue}')
+        if scale is None:
+            scale = self.imageLocator.get_resize_scale(image)
 
-            template = self.templateImages[card]
-            result = self.imageLocator.locate_all_match_on_image(image, template, region=pos, scale=scaleValue, confidence=confidenceValue)
+        for card in AllCards:
+            template = self.templateImages[f'{mark}_{card}']
+            result = self.imageLocator.locate_all_match_on_image(image, template, region=pos, scale=scale, confidence=confidence)
             if len(result) > 0:
                 count, posList = cards_filter(list(result), self.distance)
                 if card == "X" or card == "D":
                     for p in posList:
                         classifier = CC.ColorClassifier(debug=True)
-
-                        # p: (117, 49, 1334, 215) : (left, top, width, height)
-                        # print('position:', p)
-                        if mark == "my":
-                            interceptHeight = p[1] + int(p[3] * 0.18)
-                            interceptWidth = p[0] + int(p[2] * 0.022)
-                        if mark == "playedCards":
-                            self.screenHelper.WindowHeight
-                            interceptHeight = p[1] + int(p[3] * 0.140)
-                            interceptWidth = p[0] + int(p[2] * 0.035)
-                        if mark == "three":
-                            interceptHeight = p[1] + int(p[3] * 0.174)
-                            interceptWidth = p[0] + int(p[2] * 0.052)
                         
-                        # print(f'card_{card}_截取高度: ', interceptHeight - p[1])
-                        # print(f'card_{card}_截取宽度: ', interceptWidth - p[0])
+                        # print('position:', p)
+                        # p: (117, 49, 1334, 215) : (left, top, width, height)
+                        if mark == "my":
+                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.0188)
+                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.0352)
+                        if mark == "play":
+                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.01198)
+                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.02315)
+                        if mark == "three":
+                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.01042)
+                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.01852)
+                        
+                        interceptWidth = p[0] + captureWidth
+                        interceptHeight = p[1] + captureHeight
 
                         img1 = image[pos[1]:pos[1] + pos[3], pos[0]:pos[0] + pos[2]]
                         img2 = img1[p[1]:interceptHeight, p[0]:interceptWidth]
 
                         # 图片日志
                         posText = f'{p[1]}-{interceptHeight}_{p[0]}-{interceptWidth}'
-                        cv2.imwrite(f'logs/color_classify_{card}.png', img1)
-                        cv2.imwrite(f'logs/color_classify_{card}_{posText}.png', img2)
+                        cv2.imwrite(f'screenshots/logs/color_classify_{card}.png', img1)
+                        cv2.imwrite(f'screenshots/logs/color_classify_{card}_{posText}.png', img2)
 
                         result = classifier.classify(img2)
                         for r in result:
@@ -116,62 +107,46 @@ class GameHelper:
     def findThreeCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         threeCardsPos = self.screenHelper.getThreeCardsPos()
-
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image) * 0.72      # 0.68 ~ 0.76
-
-        three_cards = self.findCards(image, threeCardsPos, mark='three', scale=scale)
+        three_cards = self.findCards(image, threeCardsPos, mark='three')
+        # print(three_cards)
         return three_cards
     
     def findMyHandCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
-        # screenshot = Image.open('screenshots/test_my_hand_cards_for_X.png')
         myHandCardsPos = self.screenHelper.getMyHandCardsPos()
-
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image)
-
-        my_hand_cards = self.findCards(image, myHandCardsPos, mark='my', scale=scale)
+        my_hand_cards = self.findCards(image, myHandCardsPos, mark='my')
         # print(my_hand_cards)
         return my_hand_cards
     
     def findRightPlayedCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         rightPlayedCardsPos = self.screenHelper.getRightPlayedCardsPos()
-
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image) * 0.89      # 0.84 ~ 0.93
-
-        right_played_cards = self.findCards(image, rightPlayedCardsPos, mark='playedCards', scale=scale)
+        right_played_cards = self.findCards(image, rightPlayedCardsPos, mark='play')
         # print('right_played_cards:', right_played_cards)
         return right_played_cards
     
     def findLeftPlayedCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
         leftPlayedCardsPos = self.screenHelper.getLeftPlayedCardsPos()
-
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image) * 0.89      # 0.84 ~ 0.93
-
-        left_played_cards = self.findCards(image, leftPlayedCardsPos, mark='playedCards', scale=scale)
+        left_played_cards = self.findCards(image, leftPlayedCardsPos, mark='play')
         # print('left_played_cards:', left_played_cards)
         return left_played_cards
     
     def findMyPlayedCards(self):
         screenshot, _ = self.screenHelper.getScreenshot()
-        # screenshot = Image.open('screenshots/test_my_played_cards_for_D.png')
         myPlayedCardsPos = self.screenHelper.getMyPlayedCardsPos()
-
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image) * 0.89      # 0.84 ~ 0.93
-
-        my_played_cards = self.findCards(image, myPlayedCardsPos, mark='playedCards', scale=scale)
+        my_played_cards = self.findCards(image, myPlayedCardsPos, mark='play')
         # print('my_played_cards:', my_played_cards)
         return my_played_cards
 
     def findRightPass(self):
         screenshot, _ = self.screenHelper.getScreenshot()
-        rightPassPos = self.screenHelper.getRightPassPos()
+        rightPassPos = self.screenHelper.getRightBuchuTextPos()
 
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.get_resize_scale(image)
@@ -182,7 +157,7 @@ class GameHelper:
     
     def findLeftPass(self):
         screenshot, _ = self.screenHelper.getScreenshot()
-        leftPassPos = self.screenHelper.getLeftPassPos()
+        leftPassPos = self.screenHelper.getLeftBuchuTextPos()
 
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.get_resize_scale(image)
@@ -193,7 +168,7 @@ class GameHelper:
     
     def findMyPass(self):
         screenshot, _ = self.screenHelper.getScreenshot()
-        myPassPos = self.screenHelper.getMyPassPos()
+        myPassPos = self.screenHelper.getMyBuchuTextPos()
 
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
         scale = self.imageLocator.get_resize_scale(image)

@@ -203,13 +203,13 @@ class Worker(QThread):
         return in_game_screen
     
     def check_if_game_started(self):
-        region = self.screenHelper.getThreeCardFrontCoverPos()
+        region = self.screenHelper.getThreeCardsFrontCoverPos()
         result = self.imageLocator.locate_match_on_screen("three_card_front_cover", region) # OK
         game_started = result is not None
         return game_started
 
     def check_if_game_overed(self):
-        region = self.screenHelper.getWinOrLoseBeansPos()
+        region = self.screenHelper.getGameResultPos()
         win = self.imageLocator.locate_match_on_screen("beans_win", region)
         lose = self.imageLocator.locate_match_on_screen("beans_lose", region)
         if win is not None or lose is not None:
