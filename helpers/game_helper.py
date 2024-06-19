@@ -5,7 +5,8 @@ import time
 from PIL import Image
 from skimage.metrics import structural_similarity as ssim
 
-import helpers.color_classifier as CC
+# import helpers.color_classifier as CC
+from helpers.color_recognizer import ColorRecognizer
 from helpers.image_locator import ImageLocator
 from helpers.screen_helper import ScreenHelper
 
@@ -37,6 +38,7 @@ def cards_filter(location, distance):
 class GameHelper:
     def __init__(self):
         self.distance = 30
+        self.colorRecognizer = ColorRecognizer()
         self.imageLocator = ImageLocator()
         self.screenHelper = ScreenHelper()
         self.templateImages = self.imageLocator.templateImages
@@ -60,19 +62,17 @@ class GameHelper:
                 count, posList = cards_filter(list(result), self.distance)
                 if card == "X" or card == "D":
                     for p in posList:
-                        classifier = CC.ColorClassifier(debug=True)
-                        
                         # print('position:', p)
                         # p: (117, 49, 1334, 215) : (left, top, width, height)
                         if mark == "my":
-                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.0188)
-                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.0352)
+                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.0188) + 1
+                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.0352) + 1
                         if mark == "play":
-                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.01198)
-                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.02315)
+                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.01198) + 1
+                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.02315) + 1
                         if mark == "three":
-                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.01042)
-                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.01852)
+                            captureWidth = int(self.screenHelper.WindowWidth * scale * 0.01042) + 1
+                            captureHeight = int(self.screenHelper.WindowHeight * scale * 0.01852) + 1
                         
                         interceptWidth = p[0] + captureWidth
                         interceptHeight = p[1] + captureHeight
@@ -81,19 +81,19 @@ class GameHelper:
                         img2 = img1[p[1]:interceptHeight, p[0]:interceptWidth]
 
                         # 图片日志
-                        img1Key = self.imageLocator.compute_image_unique_key(img1)
-                        img2Key = self.imageLocator.compute_image_unique_key(img2)
-                        posText = f'{p[1]}-{interceptHeight}_{p[0]}-{interceptWidth}'
-                        cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}.png', img1)
-                        cv2.imwrite(f'screenshots/logs/cc_{card}_{img2Key}_{posText}.png', img2)
+                        # img1Key = self.imageLocator.compute_image_unique_key(img1)
+                        # posText = f'{p[1]}-{interceptHeight}_{p[0]}-{interceptWidth}'
+                        # cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}_img1.png', img1)
+                        # cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}_{posText}_img2.png', img2)
 
-                        result = classifier.classify(img2)
-                        for r in result:
-                            if r[0] == "Red":
-                                if r[1] > 0.7:
-                                    D_king = 1
-                                else:
-                                    X_king = 1
+                        color = self.colorRecognizer.check_image_is_red_or_black(img2)
+                        if card == "X" and color == "black":
+                            X_king = 1
+                            break
+
+                        if card == "D" and (color == "red" or color == "red2"):
+                            D_king = 1
+                            break
                 else:
                     cards += card[0] * count
 
@@ -188,8 +188,8 @@ class GameHelper:
         gray1 = cv2.cvtColor(np.asarray(img1), cv2.COLOR_BGR2GRAY)
         gray2 = cv2.cvtColor(np.asarray(img2), cv2.COLOR_BGR2GRAY)
 
-        # cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray1)}.png', gray1)
-        # cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray2)}.png', gray2)
+        cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray1)}.png', gray1)
+        cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray2)}.png', gray2)
 
         # 使用结构相似性指数（SSIM）比较相似度
         ssim_index, _ = ssim(gray1, gray2, full=True)
@@ -198,7 +198,7 @@ class GameHelper:
 
         return False
     
-    def have_animation(self, screenshotWaitingTime=0.1, regions=None):
+    def have_animation(self, screenshotWaitingTime=0.2, regions=None):
         if regions is None:
             return False
         

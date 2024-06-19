@@ -163,6 +163,14 @@ class ScreenHelper:
         height = int(self.WindowHeight * 0.093)
         return (left, top, width, height)
     
+    # 我的剩余牌数
+    def getMyCardsNumPos(self):
+        left = int(self.WindowWidth * 0.183)
+        top = int(self.WindowHeight * 0.464)
+        width = int(self.WindowWidth * 0.042)
+        height = int(self.WindowHeight * 0.093)
+        return (left, top, width, height)
+    
     # 对局结果，包括 赢和输的标识 以及 输赢数量
     def getGameResultPos(self):
         left = int(self.WindowWidth * 0.73)
@@ -174,36 +182,36 @@ class ScreenHelper:
     def getRightAnimation1Pos(self):
         left = int(self.WindowWidth * 0.86)
         top = int(self.WindowHeight * 0.19)
-        width = int(self.WindowWidth * 0.0785)
-        height = int(self.WindowHeight * 0.0655)
+        width = int(self.WindowWidth * 0.09)
+        height = int(self.WindowHeight * 0.0855)
         return (left, top, left + width, top + height)
     
     def getRightAnimation2Pos(self):
-        left = int(self.WindowWidth * 0.584)
-        top = int(self.WindowHeight * 0.278)
-        width = int(self.WindowWidth * 0.115)
-        height = int(self.WindowHeight * 0.075)
+        left = int(self.WindowWidth * 0.5)
+        top = int(self.WindowHeight * 0.195)
+        width = int(self.WindowWidth * 0.272)
+        height = int(self.WindowHeight * 0.13)
         return (left, top, left + width, top + height)
 
     def getLeftAnimation1Pos(self):
         left = int(self.WindowWidth * 0.06)
         top = int(self.WindowHeight * 0.19)
-        width = int(self.WindowWidth * 0.0785)
-        height = int(self.WindowHeight * 0.0655)
+        width = int(self.WindowWidth * 0.09)
+        height = int(self.WindowHeight * 0.0855)
         return (left, top, left + width, top + height)
     
     def getLeftAnimation2Pos(self):
-        left = int(self.WindowWidth * 0.23)
-        top = int(self.WindowHeight * 0.278)
-        width = int(self.WindowWidth * 0.115)
-        height = int(self.WindowHeight * 0.075)
+        left = int(self.WindowWidth * 0.22)
+        top = int(self.WindowHeight * 0.195)
+        width = int(self.WindowWidth * 0.272)
+        height = int(self.WindowHeight * 0.13)
         return (left, top, left + width, top + height)
 
     def getMyPlayedAnimationPos(self):
-        left = int(self.WindowWidth * 0.402)
-        top = int(self.WindowHeight * 0.416)
-        width = int(self.WindowWidth * 0.115)
-        height = int(self.WindowHeight * 0.075)
+        left = int(self.WindowWidth * 0.3)
+        top = int(self.WindowHeight * 0.39)
+        width = int(self.WindowWidth * 0.25)
+        height = int(self.WindowHeight * 0.186)
         return (left, top, left + width, top + height)
 
     # # 要不起

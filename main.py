@@ -1,43 +1,30 @@
 import asyncio
-from PIL import Image
-from PyQt5.QtCore import QThread
+import sys
 
-from helpers.image_locator import ImageLocator
-from helpers.screen_helper import ScreenHelper
+# import qasync
+# from PyQt5.QtWidgets import QApplication
 
-from worker import Worker
-
-async def run_thread(thread):
-    thread.start()
-    while thread.isRunning():
-        await asyncio.sleep(0.1)
+from worker_controller import WorkerController
 
 async def main():
-    thread = Worker()
-    thread.auto_sign = True
+    controller = WorkerController()
+    await controller.start_thread()
 
-    try:
-        await run_thread(thread)
-    finally:
-        thread.stop()
-        thread.wait()
+    while True:
+        await asyncio.sleep(1)
+
+def signal_handler(sig, frame):
+    print(f'sig: {sig}')
+    print(f'frame: {frame}')
+    print('You pressed `Ctrl + C`!')
+
+    asyncio.get_event_loop().stop()
 
 if __name__ == '__main__':
     import signal
-    import sys
-
-    print('ddz card recorder started')
-
-    # Handle keyboard interruption to stop the thread
-    def signal_handler(sig, frame):
-        print('You pressed Ctrl+C!')
-        asyncio.get_event_loop().stop()
-
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
-        print('Shutting down gracefully...')
-    finally:
-        print('ddz card recorder stopped')
+        print('程序已正常关闭')
