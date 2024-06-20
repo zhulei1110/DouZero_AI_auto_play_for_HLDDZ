@@ -124,9 +124,3 @@ class ColorRecognizer:
     def check_image_is_red_or_black(self, image):
         color = self.get_color(image)
         return color
- 
-if __name__ == '__main__':
-    colorRecognizer = ColorRecognizer()
-    image = cv2.imread("screenshots/logs/cc_X_2673180423679364024_129-154_328-351_img2.png", cv2.IMREAD_UNCHANGED)
-    color = colorRecognizer.check_image_is_red_or_black(image)
-    print(color)

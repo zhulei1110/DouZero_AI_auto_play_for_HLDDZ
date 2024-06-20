@@ -2,13 +2,11 @@ import cv2
 import numpy as np
 import time
 
-from PIL import Image
 from skimage.metrics import structural_similarity as ssim
 
-# import helpers.color_classifier as CC
-from helpers.color_recognizer import ColorRecognizer
-from helpers.image_locator import ImageLocator
-from helpers.screen_helper import ScreenHelper
+from helpers.ColorRecognizer import ColorRecognizer
+from helpers.ImageLocator import ImageLocator
+from helpers.ScreenHelper import ScreenHelper
 
 AllCards = ['D', 'X', '2', 'A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3']
 
@@ -36,14 +34,13 @@ def cards_filter(location, distance):
     return count, posList
 
 class GameHelper:
-    def __init__(self):
+    def __init__(self, imageLocator:ImageLocator, screenHelper:ScreenHelper):
         self.distance = 30
         self.colorRecognizer = ColorRecognizer()
-        self.imageLocator = ImageLocator()
-        self.screenHelper = ScreenHelper()
-        self.templateImages = self.imageLocator.templateImages
+        self.imageLocator = imageLocator
+        self.screenHelper = screenHelper
 
-    def findCards(self, image, pos, mark=None, scale=None, confidence=0.8):
+    async def findCards(self, image, pos, mark, scale=None, confidence=0.8):
         if mark is None:
             return None
         
@@ -52,18 +49,19 @@ class GameHelper:
         X_king = 0
 
         if scale is None:
-            scale = self.imageLocator.get_resize_scale(image)
+            scale = await self.imageLocator.get_resize_scale(image)
 
         for card in AllCards:
             templateName = f'{mark}_{card}'
-            template = self.templateImages[templateName]
-            result = self.imageLocator.locate_all_match_on_image(image, template, templateName=templateName, region=pos, scale=scale, confidence=confidence)
+            result = await self.imageLocator.locate_all_match_on_image(image=image, templateName=templateName, region=pos, scale=scale, confidence=confidence)
+            
             if len(result) > 0:
                 count, posList = cards_filter(list(result), self.distance)
                 if card == "X" or card == "D":
                     for p in posList:
-                        # print('position:', p)
-                        # p: (117, 49, 1334, 215) : (left, top, width, height)
+                        # p: (117, 49, 1334, 215) 
+                        # p: (left, top, width, height)
+
                         if mark == "my":
                             captureWidth = int(self.screenHelper.WindowWidth * scale * 0.0188) + 1
                             captureHeight = int(self.screenHelper.WindowHeight * scale * 0.0352) + 1
@@ -81,10 +79,11 @@ class GameHelper:
                         img2 = img1[p[1]:interceptHeight, p[0]:interceptWidth]
 
                         # 图片日志
-                        # img1Key = self.imageLocator.compute_image_unique_key(img1)
-                        # posText = f'{p[1]}-{interceptHeight}_{p[0]}-{interceptWidth}'
-                        # cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}_img1.png', img1)
-                        # cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}_{posText}_img2.png', img2)
+                        if self.imageLocator.image_locate_logs:
+                            img1Key = self.imageLocator.compute_image_unique_key(img1)
+                            posText = f'{p[1]}-{interceptHeight}_{p[0]}-{interceptWidth}'
+                            cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}_img1.png', img1)
+                            cv2.imwrite(f'screenshots/logs/cc_{card}_{img1Key}_{posText}_img2.png', img2)
 
                         color = self.colorRecognizer.check_image_is_red_or_black(img2)
                         if card == "X" and color == "black":
@@ -107,89 +106,98 @@ class GameHelper:
 
         return cards
     
-    def findThreeCards(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
+    async def findThreeCards(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
         threeCardsPos = self.screenHelper.getThreeCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        three_cards = self.findCards(image, threeCardsPos, mark='three')
-        # print(three_cards)
+
+        three_cards = await self.findCards(image, threeCardsPos, mark='three')
         return three_cards
     
-    def findMyHandCards(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
+    async def findMyHandCards(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
         myHandCardsPos = self.screenHelper.getMyHandCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        my_hand_cards = self.findCards(image, myHandCardsPos, mark='my')
-        # print(my_hand_cards)
+
+        my_hand_cards = await self.findCards(image, myHandCardsPos, mark='my')
         return my_hand_cards
     
-    def findRightPlayedCards(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
+    async def findRightPlayedCards(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
         rightPlayedCardsPos = self.screenHelper.getRightPlayedCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        right_played_cards = self.findCards(image, rightPlayedCardsPos, mark='play')
-        # print('right_played_cards:', right_played_cards)
+
+        right_played_cards = await self.findCards(image, rightPlayedCardsPos, mark='play')
         return right_played_cards
     
-    def findLeftPlayedCards(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
+    async def findLeftPlayedCards(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
         leftPlayedCardsPos = self.screenHelper.getLeftPlayedCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        left_played_cards = self.findCards(image, leftPlayedCardsPos, mark='play')
-        # print('left_played_cards:', left_played_cards)
+
+        left_played_cards = await self.findCards(image, leftPlayedCardsPos, mark='play')
         return left_played_cards
     
-    def findMyPlayedCards(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
+    async def findMyPlayedCards(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
         myPlayedCardsPos = self.screenHelper.getMyPlayedCardsPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        my_played_cards = self.findCards(image, myPlayedCardsPos, mark='play')
-        # print('my_played_cards:', my_played_cards)
+
+        my_played_cards = await self.findCards(image, myPlayedCardsPos, mark='play')
         return my_played_cards
 
-    def findRightBuchu(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
-        rightPassPos = self.screenHelper.getRightBuchuTextPos()
-
+    async def findRightBuchu(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
+        rightBuchuPos = self.screenHelper.getRightBuchuTextPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image)
-
-        templateName = 'buchu'
-        template = self.templateImages[templateName]
-        result = self.imageLocator.locate_first_match_on_image(image, template, templateName=templateName, region=rightPassPos, scale=scale)
+        
+        result = await self.imageLocator.locate_first_match_on_image(image, templateName='buchu', region=rightBuchuPos)
         return result
     
-    def findLeftBuchu(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
-        leftPassPos = self.screenHelper.getLeftBuchuTextPos()
-
+    async def findLeftBuchu(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
+        leftBuchuPos = self.screenHelper.getLeftBuchuTextPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image)
 
-        templateName = 'buchu'
-        template = self.templateImages[templateName]
-        result = self.imageLocator.locate_first_match_on_image(image, template, templateName=templateName, region=leftPassPos, scale=scale)
+        result = await self.imageLocator.locate_first_match_on_image(image, templateName='buchu', region=leftBuchuPos)
         return result
     
-    def findMyBuchu(self):
-        screenshot, _ = self.screenHelper.getScreenshot()
-        myPassPos = self.screenHelper.getMyBuchuTextPos()
-
+    async def findMyBuchu(self):
+        screenshot, _ = await self.screenHelper.getScreenshot()
+        myBuchuPos = self.screenHelper.getMyBuchuTextPos()
         image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
-        scale = self.imageLocator.get_resize_scale(image)
 
-        templateName = 'buchu'
-        template = self.templateImages[templateName]
-        result = self.imageLocator.locate_first_match_on_image(image, template, templateName=templateName, region=myPassPos, scale=scale)
+        result = await self.imageLocator.locate_first_match_on_image(image, templateName='buchu', region=myBuchuPos)
         return result
+
+    async def have_animation(self, screenshotWaitingTime=0.2, regions=None):
+        if regions is None:
+            return False
+        
+        image, _ = await self.screenHelper.getScreenshot()
+        previousImage = image
+
+        for i in range(2):
+            time.sleep(screenshotWaitingTime)
+
+            image, _ = await self.screenHelper.getScreenshot()
+            for region in regions:
+                if self.compare_image(image.crop(region), previousImage.crop(region)):
+                    return True
+            
+            previousImage = image
+
+        return False
 
     def compare_image(self, img1, img2):
         # 转换为灰度图
         gray1 = cv2.cvtColor(np.asarray(img1), cv2.COLOR_BGR2GRAY)
         gray2 = cv2.cvtColor(np.asarray(img2), cv2.COLOR_BGR2GRAY)
 
-        cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray1)}.png', gray1)
-        cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray2)}.png', gray2)
+        # 图片日志
+        if self.imageLocator.image_locate_logs:
+            cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray1)}.png', gray1)
+            cv2.imwrite(f'screenshots/logs/compare_image_{self.imageLocator.compute_image_unique_key(gray2)}.png', gray2)
 
         # 使用结构相似性指数（SSIM）比较相似度
         ssim_index, _ = ssim(gray1, gray2, full=True)
@@ -197,27 +205,3 @@ class GameHelper:
             return True
 
         return False
-    
-    def have_animation(self, screenshotWaitingTime=0.2, regions=None):
-        if regions is None:
-            return False
-        
-        image, _ = self.screenHelper.getScreenshot()
-        previousImage = image
-        for i in range(2):
-            time.sleep(screenshotWaitingTime)
-            image, _ = self.screenHelper.getScreenshot()
-            for region in regions:
-                if self.compare_image(image.crop(region), previousImage.crop(region)):
-                    return True
-            previousImage = image
-
-        return False
-
-# if __name__ == "__main__":
-#     gameHelper = GameHelper()
-#     gameHelper.findThreeCards()
-#     gameHelper.findMyHandCards()
-#     gameHelper.findRightPlayedCards()
-#     gameHelper.findLeftPlayedCards()
-#     gameHelper.findMyPlayedCards()
