@@ -2,5 +2,21 @@
     "window_width": 1600,
     "window_height": 900,
     "window_class_name": "UnityWndClass",
-    "image_locate_logs": false
+    "image_locate_logs": false,
+    "bidder_thresholds": {
+        "bid1": 0.2,
+        "bid2": 0.4,
+        "bid3": 0.5
+    },
+    "redouble_thresholds": {
+        "landlord_1": 0.5,
+        "landlord_2": 0.4,
+        "landlord_robbed_1": 0.6,
+        "landlord_robbed_2": 0.5,
+        "farmer_1": 1.3,
+        "farmer_2": 1.1,
+        "farmer_low_1": 1.2,
+        "farmer_low_2": 1.0
+    },
+    "mingpai_threshold": 1.5
 }

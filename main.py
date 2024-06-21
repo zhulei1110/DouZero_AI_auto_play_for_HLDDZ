@@ -4,7 +4,7 @@ import sys
 import qasync
 from PyQt5.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel
 
-from WorkerThread import WorkerThread
+from worker_thread import WorkerThread
 
 class MainWindow(QMainWindow):
     def __init__(self):

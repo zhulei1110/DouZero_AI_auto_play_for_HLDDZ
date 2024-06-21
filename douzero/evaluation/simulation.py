@@ -1,7 +1,7 @@
 import multiprocessing as mp
 import pickle
 
-from douzero.env.game import GameEnv
+from douzero.env.game_new import GameEnv
 
 def load_card_play_models(card_play_model_path_dict):
     players = {}

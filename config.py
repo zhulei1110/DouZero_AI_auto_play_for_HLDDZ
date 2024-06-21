@@ -12,6 +12,9 @@ class Config:
         self.window_height = kwargs.get('window_height', 900)
         self.window_class_name = kwargs.get('window_class_name', '')
         self.image_locate_logs = kwargs.get('image_locate_logs', False)
+        self.bidder_thresholds = kwargs.get('bidder_thresholds', {})
+        self.redouble_thresholds = kwargs.get('redouble_thresholds', {})
+        self.mingpai_threshold = kwargs.get('thresholds', 1.5)
     
     @classmethod
     def load(cls):

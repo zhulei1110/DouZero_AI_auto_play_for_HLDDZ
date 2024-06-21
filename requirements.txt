@@ -1,7 +1,12 @@
+gitdb2
+GitPython
+matplotlib~=3.7.3
 numpy~=1.23.5
 opencv-python~=4.9.0.80
 Pillow~=10.2.0
 PyQt5~=5.15.9
 pywin32==306
 qasync==0.27.1
+rlcard~=1.2.0
 scikit-image~=0.21.0
+torch~=2.0.1
