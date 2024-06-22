@@ -9,7 +9,7 @@ from helpers.GameHelper import GameHelper
 from helpers.ImageLocator import ImageLocator
 from helpers.ScreenHelper import ScreenHelper
 
-from models import BidderModel
+from models import BiddingModel
 from models import FarmerModel
 from models import LandlordModel
 
@@ -102,6 +102,10 @@ class WorkerThread(QThread):
     async def run_task(self):
         self.worker_runing = True
         while self.worker_runing:
+            if not self.env.game_over:
+                continue
+
+            print()
             print("----- WORKER STARTED -----")
             print()
 
@@ -125,7 +129,7 @@ class WorkerThread(QThread):
             while self.worker_runing and self.data_initialized and not self.card_playing:
                 await self.run_game()
 
-            await asyncio.sleep(5)
+            await asyncio.sleep(3)
 
             print("----- WORKER FINISHED -----")
             print()
@@ -328,7 +332,9 @@ class WorkerThread(QThread):
             self.reset_status()
             print('本轮对局已结束')
             print()
-            # 通知 AI 结果
+
+            self.env.game_over = True
+            self.env.reset()
 
     async def check_if_player_cards_count_zero(self):
         my_hand_cards = self.gameHelper.findMyHandCards()
@@ -528,7 +534,7 @@ class WorkerThread(QThread):
             time.sleep(0.2)
 
         if success:
-            bidScore = BidderModel.predict_score(self.my_hand_cards)
+            bidScore = BiddingModel.predict_score(self.my_hand_cards)
             print(f"预测叫地主胜率：{str(round(bidScore, 3))}")
             print()
 

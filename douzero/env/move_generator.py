@@ -6,6 +6,8 @@ class MovesGener(object):
     """
     This is for generating the possible combinations
     """
+    # 这个构造函数初始化 cards_list 并创建一个 cards_dict，用于记录每张牌的数量
+    # 然后它调用生成各种类型出牌组合的函数
     def __init__(self, cards_list):
         self.cards_list = cards_list
         self.cards_dict = collections.defaultdict(int)
@@ -24,6 +26,8 @@ class MovesGener(object):
         self.final_bomb_moves = []
         self.gen_type_5_king_bomb()
 
+    # 这个方法用于 生成 顺子、连对和飞机 的组合
+    # min_serial 表示最小连续长度，repeat 表示每种牌重复的次数，repeat_num 表示连续牌的数量
     def _gen_serial_moves(self, cards, min_serial, repeat=1, repeat_num=0):
         if repeat_num < min_serial:  # at least repeat_num is min_serial
             repeat_num = 0
@@ -71,12 +75,14 @@ class MovesGener(object):
 
         return moves
 
+    # 生成所有单张牌的组合
     def gen_type_1_single(self):
         self.single_card_moves = []
         for i in set(self.cards_list):
             self.single_card_moves.append([i])
         return self.single_card_moves
 
+    # 生成所有对子的组合
     def gen_type_2_pair(self):
         self.pair_moves = []
         for k, v in self.cards_dict.items():
@@ -84,6 +90,7 @@ class MovesGener(object):
                 self.pair_moves.append([k, k])
         return self.pair_moves
 
+    # 生成所有三张牌的组合
     def gen_type_3_triple(self):
         self.triple_cards_moves = []
         for k, v in self.cards_dict.items():
@@ -91,6 +98,7 @@ class MovesGener(object):
                 self.triple_cards_moves.append([k, k, k])
         return self.triple_cards_moves
 
+    # 生成所有炸弹的组合
     def gen_type_4_bomb(self):
         self.bomb_moves = []
         for k, v in self.cards_dict.items():
@@ -98,12 +106,14 @@ class MovesGener(object):
                 self.bomb_moves.append([k, k, k, k])
         return self.bomb_moves
 
+    # 生成王炸组合（大王和小王）
     def gen_type_5_king_bomb(self):
         self.final_bomb_moves = []
         if 20 in self.cards_list and 30 in self.cards_list:
             self.final_bomb_moves.append([20, 30])
         return self.final_bomb_moves
 
+    # 生成所有三带一的组合
     def gen_type_6_3_1(self):
         result = []
         for t in self.single_card_moves:
@@ -112,6 +122,7 @@ class MovesGener(object):
                     result.append(t+i)
         return result
 
+    # 生成所有三带二的组合
     def gen_type_7_3_2(self):
         result = list()
         for t in self.pair_moves:
@@ -120,9 +131,11 @@ class MovesGener(object):
                     result.append(t+i)
         return result
 
+    # 生成所有顺子的组合
     def gen_type_8_serial_single(self, repeat_num=0):
         return self._gen_serial_moves(self.cards_list, MIN_SINGLE_CARDS, repeat=1, repeat_num=repeat_num)
 
+    # 生成所有连对的组合
     def gen_type_9_serial_pair(self, repeat_num=0):
         single_pairs = list()
         for k, v in self.cards_dict.items():
@@ -131,6 +144,7 @@ class MovesGener(object):
 
         return self._gen_serial_moves(single_pairs, MIN_PAIRS, repeat=2, repeat_num=repeat_num)
 
+    # 生成所有飞机的组合
     def gen_type_10_serial_triple(self, repeat_num=0):
         single_triples = list()
         for k, v in self.cards_dict.items():
@@ -139,6 +153,7 @@ class MovesGener(object):
 
         return self._gen_serial_moves(single_triples, MIN_TRIPLES, repeat=3, repeat_num=repeat_num)
 
+    # 生成所有飞机带单牌的组合
     def gen_type_11_serial_3_1(self, repeat_num=0):
         serial_3_moves = self.gen_type_10_serial_triple(repeat_num=repeat_num)
         serial_3_1_moves = list()
@@ -155,6 +170,7 @@ class MovesGener(object):
 
         return list(k for k, _ in itertools.groupby(serial_3_1_moves))
 
+    # 生成所有飞机带对子的组合
     def gen_type_12_serial_3_2(self, repeat_num=0):
         serial_3_moves = self.gen_type_10_serial_triple(repeat_num=repeat_num)
         serial_3_2_moves = list()
@@ -171,6 +187,7 @@ class MovesGener(object):
 
         return serial_3_2_moves
 
+    # 生成所有四带二的组合
     def gen_type_13_4_2(self):
         four_cards = list()
         for k, v in self.cards_dict.items():
@@ -185,6 +202,7 @@ class MovesGener(object):
                 result.append([fc]*4 + i)
         return list(k for k, _ in itertools.groupby(result))
 
+    # 生成所有四带两对的组合
     def gen_type_14_4_22(self):
         four_cards = list()
         for k, v in self.cards_dict.items():

@@ -230,6 +230,7 @@ class GameEnv(object):
                     action, actions_confidence, action_list = self.players[1].act(self.game_infoset)
                 else:
                     action, actions_confidence, action_list = self.players2[1].act(self.game_infoset)
+                
                 win_rate = actions_confidence
 
                 # 特殊情况处理：直接出完牌
@@ -306,7 +307,7 @@ class GameEnv(object):
                 action_list.sort(key=self.compare_action, reverse=True)
                 action, actions_confidence = action_list[1][0], action_list[1][1]
                 win_rate = actions_confidence
-                print("炸弹胜率低于 0，不允许炸")
+                print("炸弹胜率低于0，不允许炸")
 
             if not action:
                 if float(action_list[1][1]) * 8 > 1:
@@ -314,12 +315,12 @@ class GameEnv(object):
                     action, actions_confidence = action_list[1][0], action_list[1][1]
                     win_rate = actions_confidence
                     print("第二选择胜率大于1，直接出")
-                if (position == "landlord" and (float(action_list[0][1]) - float(action_list[1][1])) * 8 < 0.2 and
-                        float(action_list[1][1]) * 8 > 0):
+                
+                if (position == "landlord" and (float(action_list[0][1]) - float(action_list[1][1])) * 8 < 0.2 and float(action_list[1][1]) * 8 > 0):
                     action_list.sort(key=self.compare_action, reverse=True)
                     action, actions_confidence = action_list[1][0], action_list[1][1]
                     win_rate = actions_confidence
-                    print("地主第二选择胜率大于 0，且与第一选择相差小于 0.2，直接出")
+                    print("地主第二选择胜率大于0，且与第一选择相差小于0.2，直接出")
 
         # 构建返回的动作信息和动作列表信息
         action_message = {
@@ -557,34 +558,20 @@ class InfoSet(object):
     """
 
     def __init__(self, player_position):
-        # The player position, i.e., landlord, landlord_down, or landlord_up
-        self.player_position = player_position
-        # The hand cands of the current player. A list.
-        self.player_hand_cards = None
-        # The number of cards left for each player. It is a dict with str-->int
-        self.num_cards_left_dict = None
-        # The three landload cards. A list.
-        self.three_landlord_cards = None
-        # The historical moves. It is a list of list
-        self.card_play_action_seq = None
-        # The union of the hand cards of the other two players for the current player
-        self.other_hand_cards = None
-        # The legal actions for the current move. It is a list of list
-        self.legal_actions = None
-        # The most recent valid move
-        self.last_move = None
-        # The most recent two moves
-        self.last_two_moves = None
-        # The last moves for all the postions
-        self.last_move_dict = None
-        # The played cands so far. It is a list.
-        self.played_cards = None
-        # The hand cards of all the players. It is a dict.
-        self.all_handcards = None
-        # Last player position that plays a valid move, i.e., not `pass`
-        self.last_pid = None
-        # The number of bombs played so far
-        self.bomb_num = None
+        self.player_position = player_position            # 玩家位置，即地主、地主下家或地主上家
+        self.player_hand_cards = None                     # 当前玩家的手牌（一个列表）
+        self.num_cards_left_dict = None                   # 每个玩家剩余的牌数（一个字典，键是字符串，值是整数）
+        self.three_landlord_cards = None                  # 三张地主牌（一个列表）
+        self.card_play_action_seq = None                  # 历史出牌记录（一个列表的列表）
+        self.other_hand_cards = None                      # 当前玩家其他两个玩家的手牌总和
+        self.legal_actions = None                         # 当前出牌的合法动作（一个列表的列表）
+        self.last_move = None                             # 最近一次有效出牌
+        self.last_two_moves = None                        # 最近两次出牌
+        self.last_move_dict = None                        # 所有位置最近一次出牌
+        self.played_cards = None                          # 到目前为止出的牌（一个列表）
+        self.all_handcards = None                         # 所有玩家的手牌（一个字典）
+        self.last_pid = None                              # 最后一个出有效牌的玩家位置，即非"过"的情况
+        self.bomb_num = None                              # 到目前为止出的炸弹数
 
         self.bid_info = [[1, 0.5, 1],
                          [1, 1, 1],
@@ -608,4 +595,5 @@ class InfoSet(object):
             self.multiply_info = [1, 2.5, 1.3]
         if player_position == 'landlord_down':
             self.multiply_info = [1, 2.5, 1.3]
+        
         self.player_id = None
