@@ -127,7 +127,8 @@ class WorkerThread(QThread):
                 await self.run_game()
 
             await asyncio.sleep(3)
-
+            
+            print()
             print("----- WORKER FINISHED -----")
             print()
 

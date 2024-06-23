@@ -17,7 +17,6 @@ class ImageLocator:
     def __init__(self, screenHelper:ScreenHelper):
         self.screenHelper = screenHelper
         self.config = Config.load()
-        self.image_locate_logs = self.config.image_locate_logs
         self.templateImages = {}
 
         for dir in dirArr:
@@ -28,11 +27,6 @@ class ImageLocator:
                     self.templateImages.update({arr[0]: imgCV})
 
         # print('self.templateImages: ', self.templateImages)
-    
-    def compute_image_unique_key(self, image):
-        image_bytes = image.tobytes()
-        hash_value = hash(image_bytes)
-        return hash_value
     
     async def get_resize_scale(self, image=None):
         if image is None:
@@ -62,8 +56,8 @@ class ImageLocator:
             image = image[y:y + h, x:x + w]
 
             # 图片日志
-            if self.image_locate_logs:
-                imageKey = self.compute_image_unique_key(image)
+            if self.config.image_locate_logs:
+                imageKey = self.screenHelper.compute_image_unique_key(image)
                 regionText = str(region).replace(' ', '').replace(',', '-')
                 cv2.imwrite(f'screenshots/logs/LAM_{templateName}_{regionText}_{imageKey}.png', image)
 
@@ -71,8 +65,8 @@ class ImageLocator:
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
-        if self.image_locate_logs:
-            templateKey = self.compute_image_unique_key(template)
+        if self.config.image_locate_logs:
+            templateKey = self.screenHelper.compute_image_unique_key(template)
             scaleText = f"{scale:.{4}f}".replace('.', '-')
             cv2.imwrite(f'screenshots/logs/LAM_{templateName}_{regionText}_{scaleText}_{templateKey}.png', template)
 
@@ -111,16 +105,16 @@ class ImageLocator:
             image = image[y:y + h, x:x + w, :]
 
             # 图片日志
-            if self.image_locate_logs:
-                imageKey = self.compute_image_unique_key(image)
+            if self.config.image_locate_logs:
+                imageKey = self.screenHelper.compute_image_unique_key(image)
                 regionText = str(region).replace(' ', '').replace(',', '-')
                 cv2.imwrite(f'screenshots/logs/LFM_{templateName}_{regionText}_{imageKey}.png', image)
 
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
-        if self.image_locate_logs:
-            templateKey = self.compute_image_unique_key(template)
+        if self.config.image_locate_logs:
+            templateKey = self.screenHelper.compute_image_unique_key(template)
             scaleText = f"{scale:.{4}f}".replace('.', '-')
             cv2.imwrite(f'screenshots/logs/LFM_{templateName}_{regionText}_{scaleText}_{templateKey}.png', template)
 

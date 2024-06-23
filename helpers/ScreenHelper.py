@@ -1,7 +1,9 @@
 import asyncio
-
+import cv2
 import win32gui
 import win32ui
+
+import numpy as np
 
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
@@ -62,6 +64,11 @@ class ScreenHelper:
 
     def getZoomRate(self):
         self.ScreenZoomRate = windll.shcore.GetScaleFactorForDevice(0) / 100
+    
+    def compute_image_unique_key(self, image):
+        image_bytes = image.tobytes()
+        hash_value = hash(image_bytes)
+        return hash_value
 
     async def getScreenshot(self, region=None):
         loop = asyncio.get_running_loop()
@@ -97,6 +104,16 @@ class ScreenHelper:
 
                 if region is not None:
                     image = image.crop((region[0], region[1], region[0] + region[2], region[1] + region[3]))
+
+                # 图片日志
+                if self.config.screenshot_logs:
+                    imageKey = self.compute_image_unique_key(image)
+                    saveImage = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+                    if region is not None:
+                        regionText = str(region).replace(' ', '').replace(',', '-')
+                        cv2.imwrite(f'screenshots/logs/{imageKey}_{regionText}.png', saveImage)
+                    else:
+                        cv2.imwrite(f'screenshots/logs/{imageKey}_no_region.png', saveImage)
 
                 if result:
                     success = True
