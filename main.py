@@ -4,7 +4,8 @@ import sys
 import qasync
 from PyQt5.QtWidgets import QMainWindow, QPushButton, QVBoxLayout, QWidget, QLabel
 
-from worker_thread import WorkerThread
+# from worker_thread import WorkerThread
+from worker import WorkerThread
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -33,7 +34,7 @@ class MainWindow(QMainWindow):
             self.worker_thread.start()
             self.button.setText("停止线程")
         else:
-            self.worker_thread.stop()
+            self.worker_thread.stop_task()
             self.worker_thread.quit()
             self.worker_thread.wait()
             self.button.setText("启动线程")

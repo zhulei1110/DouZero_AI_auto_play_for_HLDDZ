@@ -5,7 +5,7 @@ import time
 from PyQt5.QtCore import pyqtSignal, QThread
 
 from config import Config
-from helpers.GameHelper import GameHelper
+from helpers.GameHelper import GameHelper, AnimationArea
 from helpers.ImageLocator import ImageLocator
 from helpers.ScreenHelper import ScreenHelper
 
@@ -102,9 +102,6 @@ class WorkerThread(QThread):
     async def run_task(self):
         self.worker_runing = True
         while self.worker_runing:
-            if not self.env.game_over:
-                continue
-
             print()
             print("----- WORKER STARTED -----")
             print()
@@ -136,11 +133,93 @@ class WorkerThread(QThread):
 
         # self.finished_signal.emit()
 
-    def stop(self):
-        self.worker_runing = False
-        self.reset_status()
-        print("正在停止工作线程...")
-    
+    async def before_start(self):
+        print('正在检测是否开局...')
+
+        self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
+        while self.worker_runing and not self.in_game_start_screen:
+            print("等待手动进入开始游戏界面...")
+            self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
+            time.sleep(1.2)
+
+        game_started = False
+        if self.in_game_start_screen:
+            print("您已进入开始游戏界面")
+
+            game_started = await self.gameHelper.check_if_game_started()
+            if not game_started:
+                print("对局尚未开始")
+
+            while self.worker_runing and not game_started:
+                print("等待手动开始对局...")
+                game_started = await self.gameHelper.check_if_game_started()
+                time.sleep(1.2)
+        
+        if game_started:
+            print("对局已开始")
+            print()
+            self.game_started = True
+            await self.getThreeCards()
+
+    async def initial_data(self):
+        self.data_initializing = True
+
+        await self.getMyPosition()
+        await self.getMyHandCards()
+
+        print("正在处理本次牌局数据...")
+        self.initOtherPlayerHandCards()
+        self.initAllPlayerCardData()
+        print()
+
+        self.play_order = 0 if self.my_position == "landlord" else 1 if self.my_position == "landlord_up" else 2
+        playOrderArr = ['我先出牌', '我的下家先出牌', '我的上家先出牌']
+        print('本局出牌顺序: ', playOrderArr[self.play_order])
+        print()
+
+        self.data_initialized = True
+        self.data_initializing = False
+
+    async def run_game(self):
+        print('准备就绪，玩家开始出牌...')
+        print()
+        self.card_playing = True
+
+        thread_right_loop = asyncio.new_event_loop()
+        thread_right = threading.Thread(target=run_async_task_in_thread, args=(thread_right_loop, self.getRightPlayedCards()))
+
+        thread_left_loop = asyncio.new_event_loop()
+        thread_left = threading.Thread(target=run_async_task_in_thread, args=(thread_left_loop, self.getLeftPlayedCards()))
+
+        thread_my_loop = asyncio.new_event_loop()
+        thread_my = threading.Thread(target=run_async_task_in_thread, args=(thread_my_loop, self.getMyPlayedCards()))
+
+        thread_right.start()
+        thread_left.start()
+        thread_my.start()
+
+        if self.play_order == 0:        # 顺序：我 --> 右边玩家 --> 左边玩家
+            self.my_play_done.set()
+        elif self.play_order == 1:      # 顺序：右边玩家 --> 左边玩家 --> 我
+            self.right_play_done.set()
+        elif self.play_order == 2:      # 顺序：左边玩家 --> 我 --> 右边玩家
+            self.left_play_done.set()
+
+        while self.worker_runing and self.card_playing:
+            # print('正在检测对局是否结束...')
+            game_overed = await self.gameHelper.check_if_game_overed()
+            if game_overed:
+                self.reset_status()
+                print('本轮对局已结束')
+                print()
+
+            time.sleep(2)
+        
+        # 等待所有线程完成
+        thread_my.join()
+        thread_right.join()
+        thread_left.join()
+
     def reset_status(self):
         self.in_game_start_screen = False
         self.game_started = False
@@ -163,40 +242,16 @@ class WorkerThread(QThread):
         self.right_play_done.set()
         self.left_play_done.set()
 
-    async def before_start(self):
-        print('正在检测是否开局...')
-
-        self.in_game_start_screen = await self.check_if_in_game_start_screen()
-        while self.worker_runing and not self.in_game_start_screen:
-            print("等待手动进入开始游戏界面...")
-            self.in_game_start_screen = await self.check_if_in_game_start_screen()
-            time.sleep(1.2)
-
-        game_started = False
-        if self.in_game_start_screen:
-            print("您已进入开始游戏界面")
-
-            game_started = await self.check_if_game_started()
-            if not game_started:
-                print("对局尚未开始")
-
-            while self.worker_runing and not game_started:
-                print("等待手动开始对局...")
-                game_started = await self.check_if_game_started()
-                time.sleep(1.2)
-        
-        if game_started:
-            print("对局已开始")
-            print()
-            self.game_started = True
-            await self.predict_to_bidding_score()
-            await self.get_three_cards()
-
-    async def get_three_cards(self):
+    def stop_task(self):
+        self.worker_runing = False
+        self.reset_status()
+        print("正在停止工作线程...")
+    
+    async def getThreeCards(self):
         print("正在识别三张底牌...")
 
         while self.worker_runing and len(self.three_cards) != 3:
-            self.three_cards = await self.gameHelper.findThreeCards()
+            self.three_cards = await self.gameHelper.get_three_cards()
             time.sleep(1.2)
         
         # 成功获取到三张底牌，意味着地主已确定 
@@ -206,11 +261,11 @@ class WorkerThread(QThread):
         print(f"三张底牌：{self.three_cards}")
         print()
 
-    async def get_my_position(self):
+    async def getMyPosition(self):
         print("正在识别我的角色...")
 
         while self.worker_runing and self.my_position_code is None:
-            self.my_position_code = await self.find_my_postion()
+            self.my_position_code = await self.gameHelper.get_my_position()
             time.sleep(0.2)
 
         self.my_position = PlayerPosition[self.my_position_code]
@@ -218,21 +273,21 @@ class WorkerThread(QThread):
         print("我的角色：", self.my_position)
         print()
 
-    async def get_my_hand_cards(self):
+    async def getMyHandCards(self):
         print("正在识别我的手牌...")
 
         success = False
-        self.my_hand_cards = await self.gameHelper.findMyHandCards()
+        self.my_hand_cards = await self.gameHelper.get_my_hand_cards()
         if self.my_position_code == 1:
             while self.worker_runing and len(self.my_hand_cards) != 20 and not success:
-                self.my_hand_cards = await self.gameHelper.findMyHandCards()
+                self.my_hand_cards = await self.gameHelper.get_my_hand_cards()
                 success = len(self.my_hand_cards) == 20
                 time.sleep(0.2)
 
             self.my_hand_cards_env = [RealCard2EnvCard[c] for c in list(self.my_hand_cards)]
         else:
             while self.worker_runing and len(self.my_hand_cards) != 17 and not success:
-                self.my_hand_cards = await self.gameHelper.findMyHandCards()
+                self.my_hand_cards = await self.gameHelper.get_my_hand_cards()
                 success = len(self.my_hand_cards) == 17
                 time.sleep(0.2)
 
@@ -241,14 +296,18 @@ class WorkerThread(QThread):
         print("我的手牌：", self.my_hand_cards)
         print()
 
-    async def initial_data(self):
-        self.data_initializing = True
+    def initOtherPlayerHandCards(self):
+        self.other_player_cards = []
+        self.all_player_card_data = {}
 
-        await self.get_my_position()
-        await self.get_my_hand_cards()
+        for i in set(AllEnvCard):
+            # 对于每一张牌（i），计算它在整副牌 AllEnvCard 中出现的次数，减去玩家手牌中该牌出现的次数，即为其他玩家手牌中该牌的数量
+            self.other_player_cards.extend([i] * (AllEnvCard.count(i) - self.my_hand_cards_env.count(i)))
 
-        print("正在处理本次牌局数据...")
-        self.get_other_player_hand_cards()
+        # 将 self.other_player_hand_cards 中的 env牌编码转换为实际的牌面字符，并将它们组合成一个字符串，最后将其反转
+        self.other_hands_cards_str = str(''.join([EnvCard2RealCard[c] for c in self.other_player_cards]))[::-1]
+
+    def initAllPlayerCardData(self):
         # 这里将牌局的相关数据更新到 self.all_player_card_data 中，包括底牌和每个角色的手牌
         self.all_player_card_data.update({
             'three_landlord_cards':
@@ -262,92 +321,8 @@ class WorkerThread(QThread):
             PlayerPosition[(self.my_position_code + 2) % 3]:
                 self.other_player_cards[0:17] if (self.my_position_code + 1) % 3 == 1 else self.other_player_cards[17:]
         })
-        print()
 
-        self.play_order = 0 if self.my_position == "landlord" else 1 if self.my_position == "landlord_up" else 2
-        playOrderDescMap = ['我先出牌', '我的下家先出牌', '我的上家先出牌']
-        print('本局出牌顺序: ', playOrderDescMap[self.play_order])
-        print()
-        
-        self.creating_an_AI_to_represent_the_player()
-        await self.predict_to_current_round_score()
-
-        self.data_initialized = True
-        self.data_initializing = False
-
-    async def run_game(self):
-        self.env.card_play_init(self.all_player_card_data)
-
-        print('准备就绪，玩家开始出牌...')
-        print()
-        self.card_playing = True
-
-        thread_right_loop = asyncio.new_event_loop()
-        thread_right = threading.Thread(target=run_async_task_in_thread, args=(thread_right_loop, self.get_right_played_cards()))
-
-        thread_left_loop = asyncio.new_event_loop()
-        thread_left = threading.Thread(target=run_async_task_in_thread, args=(thread_left_loop, self.get_left_played_cards()))
-
-        thread_my_loop = asyncio.new_event_loop()
-        thread_my = threading.Thread(target=run_async_task_in_thread, args=(thread_my_loop, self.get_my_played_cards()))
-
-        thread_right.start()
-        thread_left.start()
-        thread_my.start()
-
-        if self.play_order == 0:        # 顺序：我 --> 右边玩家 --> 左边玩家
-            self.my_play_done.set()
-        elif self.play_order == 1:      # 顺序：右边玩家 --> 左边玩家 --> 我
-            self.right_play_done.set()
-        elif self.play_order == 2:      # 顺序：左边玩家 --> 我 --> 右边玩家
-            self.left_play_done.set()
-
-        while self.worker_runing and self.card_playing:
-            # print('正在检测对局是否结束...')
-            await self.check_if_game_overed()
-            time.sleep(2)
-        
-        # 等待所有线程完成
-        thread_my.join()
-        thread_right.join()
-        thread_left.join()
-
-    async def check_if_in_game_start_screen(self):
-        region = self.screenHelper.getChatBtnPos()
-        result = await self.imageLocator.locate_match_on_screen("chat_btn", region)
-        in_game_screen = result is not None
-        return in_game_screen
-    
-    async def check_if_game_started(self):
-        region = self.screenHelper.getThreeCardsFrontCoverPos()
-        result = await self.imageLocator.locate_match_on_screen("three_card_front_cover", region) # OK
-        game_started = result is not None
-        return game_started
-
-    async def check_if_game_overed(self):
-        region = self.screenHelper.getGameResultPos()
-        win = await self.imageLocator.locate_match_on_screen("beans_win", region)
-        lose = await self.imageLocator.locate_match_on_screen("beans_lose", region)
-        if win is not None or lose is not None:
-            self.reset_status()
-            print('本轮对局已结束')
-            print()
-
-            self.env.game_over = True
-            self.env.reset()
-
-    async def check_if_player_cards_count_zero(self):
-        my_hand_cards = self.gameHelper.findMyHandCards()
-        rightCardsNumPos = self.screenHelper.getRightCardsNumPos()
-        leftCardsNumPos = self.screenHelper.getLeftCardsNumPos()
-        rightCardsCountZero = await self.imageLocator.locate_match_on_screen("cards_count_zero", rightCardsNumPos)
-        leftCardsCountZero = await self.imageLocator.locate_match_on_screen("cards_count_zero", leftCardsNumPos)
-        if len(my_hand_cards) == 0 or rightCardsCountZero is not None or leftCardsCountZero is not None:
-            self.reset_status()
-            print('本轮对局已结束')
-            # 通知 AI 结果
-
-    async def get_right_played_cards(self, first=False):
+    async def getRightPlayedCards(self, first=False):
         while self.worker_runing and self.card_playing:
             self.right_play_done.wait()
             if not self.card_playing:
@@ -360,25 +335,20 @@ class WorkerThread(QThread):
             if self.waiting_animation_to_end:
                 continue
 
-            rightAnimation1Pos = self.screenHelper.getRightAnimation1Pos()
-            rightAnimation2Pos = self.screenHelper.getRightAnimation2Pos()
-            rightPlayedCardsPos = self.screenHelper.getRightPlayedCardsPos()
-            left, top, width, height = rightPlayedCardsPos
-            rightPlayedAnimationPos = (left, top, left + width, top + height)
-            haveAnimation = await self.gameHelper.have_animation(regions=[rightAnimation1Pos, rightAnimation2Pos, rightPlayedAnimationPos])
+            haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.RIGHT_PLAYED_ANIMATION.value)
             if haveAnimation:
                 self.waiting_animation_to_end = True
-                print('等待动画结束...')
+                print('等待右侧动画结束...')
                 print()
-                time.sleep(0.8)
+                time.sleep(0.5)
 
             self.waiting_animation_to_end = False
             rightBuchu = None
             rightPlayedCards = None
 
             if not first:
-                rightBuchu = await self.gameHelper.findRightBuchu()
-            rightPlayedCards = await self.gameHelper.findRightPlayedCards()
+                rightBuchu = await self.gameHelper.get_right_played_text(template='buchu')
+            rightPlayedCards = await self.gameHelper.get_right_played_cards()
 
             if rightBuchu is not None:
                 time.sleep(0.4)
@@ -389,7 +359,7 @@ class WorkerThread(QThread):
             if rightPlayed:
                 print(f"右侧玩家 >>> 已出牌：{rightPlayedCards}")
                 print()
-                time.sleep(0.2)
+                time.sleep(0.3)
         
             if rightBuchu is not None or rightPlayed:
                 self.right_play_completed = True
@@ -397,7 +367,7 @@ class WorkerThread(QThread):
                 self.right_play_done.clear()
                 self.left_play_done.set()
 
-    async def get_left_played_cards(self, first=False):
+    async def getLeftPlayedCards(self, first=False):
         while self.worker_runing and self.card_playing:
             self.left_play_done.wait()
             if not self.card_playing:
@@ -410,25 +380,20 @@ class WorkerThread(QThread):
             if self.waiting_animation_to_end:
                 continue
 
-            leftAnimation1Pos = self.screenHelper.getLeftAnimation1Pos()
-            leftAnimation2Pos = self.screenHelper.getLeftAnimation2Pos()
-            leftPlayedCardsPos = self.screenHelper.getLeftPlayedCardsPos()
-            left, top, width, height = leftPlayedCardsPos
-            leftPlayedAnimationPos = (left, top, left + width, top + height)
-            haveAnimation = await self.gameHelper.have_animation(regions=[leftAnimation1Pos, leftAnimation2Pos, leftPlayedAnimationPos])
+            haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.LEFT_PLAYED_ANIMATION.value)
             if haveAnimation:
                 self.waiting_animation_to_end = True
-                print('等待动画结束...')
+                print('等待左侧动画结束...')
                 print()
-                time.sleep(0.8)
+                time.sleep(0.5)
             
             self.waiting_animation_to_end = False
             leftBuchu = None
             leftPlayedCards = None
             
             if not first:
-                leftBuchu = await self.gameHelper.findLeftBuchu()
-            leftPlayedCards = await self.gameHelper.findLeftPlayedCards()
+                leftBuchu = await self.gameHelper.get_left_played_text(template='buchu')
+            leftPlayedCards = await self.gameHelper.get_left_played_cards()
 
             if leftBuchu is not None:
                 time.sleep(0.4)
@@ -439,7 +404,7 @@ class WorkerThread(QThread):
             if leftPlayed:
                 print(f"左侧玩家 >>> 已出牌：{leftPlayedCards}")
                 print()
-                time.sleep(0.2)
+                time.sleep(0.3)
             
             if leftBuchu is not None or leftPlayed:
                 self.left_play_completed = True
@@ -447,7 +412,7 @@ class WorkerThread(QThread):
                 self.left_play_done.clear()
                 self.my_play_done.set()
     
-    async def get_my_played_cards(self, first=False):
+    async def getMyPlayedCards(self, first=False):
         while self.worker_runing and self.card_playing:
             self.my_play_done.wait()
             if not self.card_playing:
@@ -460,24 +425,20 @@ class WorkerThread(QThread):
             if self.waiting_animation_to_end:
                 continue
 
-            myAnimationPos = self.screenHelper.getMyPlayedAnimationPos()
-            myPlayedCardsPos = self.screenHelper.getMyPlayedCardsPos()
-            left, top, width, height = myPlayedCardsPos
-            myPlayedAnimationPos = (left, top, left + width, top + height)
-            haveAnimation = await self.gameHelper.have_animation(regions=[myAnimationPos, myPlayedAnimationPos])
+            haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.MY_PLAYED_ANIMATION.value)
             if haveAnimation:
                 self.waiting_animation_to_end = True
-                print('等待动画结束...')
+                print('等待我的动画结束...')
                 print()
-                time.sleep(0.8)
+                time.sleep(0.5)
 
             self.waiting_animation_to_end = False
             myBuchu = None
             myPlayedCards = None
             
             if not first:
-                myBuchu = await self.gameHelper.findMyBuchu()
-            myPlayedCards = await self.gameHelper.findMyPlayedCards()
+                myBuchu = await self.gameHelper.get_my_played_text(template='buchu')
+            myPlayedCards = await self.gameHelper.get_my_played_cards()
 
             if myBuchu is not None:
                 time.sleep(0.4)
@@ -488,7 +449,7 @@ class WorkerThread(QThread):
             if myPlayed:
                 print(f"我 >>> 已出牌：{myPlayedCards}")
                 print()
-                time.sleep(0.2)
+                time.sleep(0.3)
 
             if (myBuchu is not None) or myPlayed:
                 self.my_play_completed = True
@@ -496,40 +457,11 @@ class WorkerThread(QThread):
                 self.my_play_done.clear()
                 self.right_play_done.set()
 
-    async def find_my_postion(self):
-        # 玩家角色：0-地主上家, 1-地主, 2-地主下家
-
-        rightLandlordHatRegion = self.screenHelper.getRightLandlordFlagPos()
-        result1 = await self.imageLocator.locate_match_on_screen("landlord_hat", rightLandlordHatRegion)
-        if result1 is not None:
-            return 0 # 如果右边是地主，我就是地主上家
-
-        leftLandlordHatRegion = self.screenHelper.getLeftLandlordFlagPos()
-        result2 = await self.imageLocator.locate_match_on_screen("landlord_hat", leftLandlordHatRegion)
-        if result2 is not None:
-            return 2 # 如果左边是地主，我就是地主下家
-
-        myLandlordHatRegion = self.screenHelper.getMyLandlordFlagPos()
-        result3 = await self.imageLocator.locate_match_on_screen("landlord_hat", myLandlordHatRegion)
-        if result3 is not None:
-            return 1
-
-    def get_other_player_hand_cards(self):
-        self.other_player_cards = []
-        self.all_player_card_data = {}
-
-        for i in set(AllEnvCard):
-            # 对于每一张牌（i），计算它在整副牌 AllEnvCard 中出现的次数，减去玩家手牌中该牌出现的次数，即为其他玩家手牌中该牌的数量
-            self.other_player_cards.extend([i] * (AllEnvCard.count(i) - self.my_hand_cards_env.count(i)))
-
-        # 将 self.other_player_hand_cards 中的 env牌编码转换为实际的牌面字符，并将它们组合成一个字符串，最后将其反转
-        self.other_hands_cards_str = str(''.join([EnvCard2RealCard[c] for c in self.other_player_cards]))[::-1]
-
     async def predict_to_bidding_score(self):
         success = False
-        my_hand_cards = await self.gameHelper.findMyHandCards()
+        my_hand_cards = await self.gameHelper.get_my_hand_cards()
         while self.worker_runing and len(self.my_hand_cards) != 17 and not success:
-            my_hand_cards = await self.gameHelper.findMyHandCards()
+            my_hand_cards = await self.gameHelper.get_my_hand_cards()
             success = len(my_hand_cards) == 17
             time.sleep(0.2)
 
@@ -557,36 +489,3 @@ class WorkerThread(QThread):
         AI[0] = self.my_position
         AI[1] = DeepAgent(self.my_position, self.model_path_dict[self.my_position])
         self.env = GameEnv(AI)
-
-    # def auto_operation(self):
-    #     if self.play_cards_automatically:
-    #         self.detect_and_click_continue_game_btn()
-    #         self.detect_and_click_quick_start_btn()
-    #         self.detect_and_click_start_btn()
-    #     else:
-    #         pass
-
-    # def detect_and_click_quick_start_btn(self):
-    #     region = self.screenHelper.getQuickStartBtnPos()
-    #     result = self.imageLocator.locate_match_on_screen("quick_start_btn", region) # OK
-    #     if result is not None:
-    #         # self.gameHelper.ClickOnImage("quick_start_btn", region)
-    #         print('模拟点击 ·快速开始· 按钮')
-    #         # time.sleep(1)
-    
-    # def detect_and_click_start_btn(self):
-    #     region = self.screenHelper.getStartGameBtnPos()
-    #     result = self.imageLocator.locate_match_on_screen("start_game_btn", region) # OK
-    #     if result is not None:
-    #         # self.gameHelper.ClickOnImage("start_game_btn", region)
-    #         print('模拟点击 ·开始游戏· 按钮')
-    #         # time.sleep(1)
-
-    # def detect_and_click_continue_game_btn(self):
-    #     region = self.screenHelper.getContinueGameBtnPos()
-    #     result = self.imageLocator.locate_match_on_screen("continue_game_btn", region) # OK
-    #     if result is not None:
-    #         self.game_started = False
-    #         # 通知 AI 结果
-    #         # self.gameHelper.ClickOnImage("continue_game_btn", region)
-    #         print('模拟点击 ·继续游戏· 按钮')

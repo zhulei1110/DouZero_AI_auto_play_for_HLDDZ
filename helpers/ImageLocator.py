@@ -148,8 +148,8 @@ class ImageLocator:
             # print('position: ', _)
         
         # 将 PIL 格式图像转换为 OpenCV 格式（BGR）
-        imgcv = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
+        img = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
 
         # 调用 LocateOnImage 函数在图像中查找模板图像的位置
-        result = await self.locate_first_match_on_image(image=imgcv, templateName=templateName, region=region, scale=scale, confidence=confidence)
+        result = await self.locate_first_match_on_image(image=img, templateName=templateName, region=region, scale=scale, confidence=confidence)
         return result

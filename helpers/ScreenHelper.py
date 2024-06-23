@@ -3,11 +3,50 @@ import asyncio
 import win32gui
 import win32ui
 
+from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
 from ctypes import windll
 from PIL import Image
 
 from config import Config
+
+class ScreenshotArea(Enum):
+    QUICK_START_BTN = "quick_start_btn"
+    CHAT_BTN = "chat_btn"
+    START_GAME_BTN = "start_game_btn"
+    MING_PAI_4S_BTN = "ming_pai_4s_btn"
+    CALL_LANDLORD_BTN = "call_landlord_btn"
+    NOT_CALL_LANDLORD_BTN = "not_call_landlord_btn"
+    SCRAMBLE_LANDLORD_BTN = "scramble_landlord_btn"
+    NOT_SCRAMBLE_LANDLORD_BTN = "not_scramble_landlord_btn"
+    REDOUBLE_BTN = "redouble_btn"
+    NOT_REDOUBLE_BTN = "not_redouble_btn"
+    SUPER_REDOUBLE_BTN = "super_redouble_btn"
+    MING_PAI_BTN = "ming_pai_btn"
+    PLAY_CARDS_BTN = "play_cards_btn"
+    NOT_PLAY_CARDS_BTN = "not_play_cards_btn"
+    CAN_NOT_PLAY_CARDS_BTN = "can_not_play_cards_btn"
+    CONTINUE_GAME_BTN = "continue_game_btn"
+    THREE_CARDS_FRONT_COVER = "three_cards_front_cover"
+    THREE_CARDS = "three_cards"
+    RIGHT_LANDLORD_FLAG = "right_landlord_flag"
+    LEFT_LANDLORD_FLAG = "left_landlord_flag"
+    MY_LANDLORD_FLAG = "my_landlord_flag"
+    MY_HAND_CARDS = "my_hand_cards"
+    RIGHT_REMAINING_CARDS_COUNT = "right_remaining_cards_count"
+    LEFT_REMAINING_CARDS_COUNT = "left_remaining_cards_count"
+    RIGHT_PLAYED_CARDS = "right_played_cards"
+    LEFT_PLAYED_CARDS = "left_played_cards"
+    MY_PLAYED_CARDS = "my_played_cards"
+    RIGHT_PLAYED_TEXT = "right_played_text"
+    LEFT_PLAYED_TEXT = "left_played_text"
+    MY_PLAYED_TEXT = "my_played_text"
+    RIGHT_PLAYED_ANIMATION_1 = "right_played_animation_1"
+    RIGHT_PLAYED_ANIMATION_2 = "right_played_animation_2"
+    LEFT_PLAYED_ANIMATION_1 = "left_played_animation_1"
+    LEFT_PLAYED_ANIMATION_2 = "left_played_animation_2"
+    MY_PLAYED_ANIMATION = "my_played_animation"
+    GAME_RESULT = "game_result"
 
 class ScreenHelper:
     def __init__(self):
@@ -16,6 +55,7 @@ class ScreenHelper:
         self.BaseHeight = 1080
         self.WindowWidth = self.config.window_width
         self.WindowHeight = self.config.window_height
+        self.ScreenshotAreas = self.config.screenshot_areas
         self.Handle = win32gui.FindWindow(self.config.window_class_name, None)
         self.ScreenZoomRate = None
         self.getZoomRate()
@@ -88,256 +128,28 @@ class ScreenHelper:
             print("capture screenshot error:", repr(e))
             return None, False
 
-    # 聊天按钮区域
-    def getChatBtnPos(self):
-        left = int(self.WindowWidth * 0.9075)
-        top = int(self.WindowHeight * 0.925)
-        width = int(self.WindowWidth * 0.089)
-        height = int(self.WindowHeight * 0.076)
-        return (left, top, width, height)
-    
-    # 快速开始按钮
-    def getQuickStartBtnPos(self):
-        left = int(self.WindowWidth * 0.792)
-        top = int(self.WindowHeight * 0.875)
-        width = int(self.WindowWidth * 0.192)
-        height = int(self.WindowHeight * 0.11)
-        return (left, top, width, height)
-    
-    # 开始游戏按钮
-    def getStartGameBtnPos(self):
-        left = int(self.WindowWidth * 0.506)
-        top = int(self.WindowHeight * 0.593)
-        width = int(self.WindowWidth * 0.185)
-        height = int(self.WindowHeight * 0.12)
-        return (left, top, width, height)
-    
-    # 继续游戏按钮
-    def getContinueGameBtnPos(self):
-        left = int(self.WindowWidth * 0.73)
-        top = int(self.WindowHeight * 0.755)
-        width = int(self.WindowWidth * 0.157)
-        height = int(self.WindowHeight * 0.1)
-        return (left, top, width, height)
-    
-    # 底牌封面
-    def getThreeCardsFrontCoverPos(self):
-        left = int(self.WindowWidth * 0.415)
-        top = int(self.WindowHeight * 0.037)
-        width = int(self.WindowWidth * 0.064)
-        height = int(self.WindowHeight * 0.149)
-        return (left, top, width, height)  
+    def parse_and_calculate(self, areaStr):
+        # 解析输入字符串
+        values = areaStr.split(',')
+        left_ratio = round(float(values[0]), 4)
+        top_ratio = round(float(values[1]), 4)
+        width_ratio = round(float(values[2]), 4)
+        height_ratio = round(float(values[3]), 4)
+        
+        # 计算具体值
+        left = int(left_ratio * self.WindowWidth)
+        top = int(top_ratio * self.WindowHeight)
+        width = int(width_ratio * self.WindowWidth)
+        height = int(height_ratio * self.WindowHeight)
+        
+        return left, top, width, height
 
-    # 3张底牌区域
-    def getThreeCardsPos(self):
-        left = int(self.WindowWidth * 0.415)
-        top = int(self.WindowHeight * 0.037)
-        width = int(self.WindowWidth * 0.168)
-        height = int(self.WindowHeight * 0.149)
-        return (left, top, width, height)
-
-    # 右边玩家地主标志
-    def getRightLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.846)
-        top = int(self.WindowHeight * 0.27)
-        width = int(self.WindowWidth * 0.064)
-        height = int(self.WindowHeight * 0.13)
+    def getCapturePosition(self, areaName):
+        areaStr = self.ScreenshotAreas[areaName]
+        left, top, width, height = self.parse_and_calculate(areaStr)
         return (left, top, width, height)
     
-    # 左边玩家地主标志
-    def getLeftLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.075)
-        top = int(self.WindowHeight * 0.27)
-        width = int(self.WindowWidth * 0.064)
-        height = int(self.WindowHeight * 0.13)
-        return (left, top, width, height)
-    
-    # 我的地主标志
-    def getMyLandlordFlagPos(self):
-        left = int(self.WindowWidth * 0.002)
-        top = int(self.WindowHeight * 0.765)
-        width = int(self.WindowWidth * 0.064)
-        height = int(self.WindowHeight * 0.13)
-        return (left, top, width, height)
-
-    # 我的手牌区域
-    def getMyHandCardsPos(self):
-        left = int(self.WindowWidth * 0.13)
-        top = int(self.WindowHeight * 0.695)
-        width = int(self.WindowWidth * 0.73)
-        height = int(self.WindowHeight * 0.24)
-        return (left, top, width, height)
-
-    # 右边玩家出牌区域
-    def getRightPlayedCardsPos(self):
-        left = int(self.WindowWidth * 0.5)
-        top = int(self.WindowHeight * 0.33)
-        width = int(self.WindowWidth * 0.272)
-        height = int(self.WindowHeight * 0.24)
-        return (left, top, width, height)
-
-    # 左边玩家出牌区域
-    def getLeftPlayedCardsPos(self):
-        left = int(self.WindowWidth * 0.22)
-        top = int(self.WindowHeight * 0.33)
-        width = int(self.WindowWidth * 0.272)
-        height = int(self.WindowHeight * 0.24)
-        return (left, top, width, height)
-    
-    # 我的出牌区域
-    def getMyPlayedCardsPos(self):
-        left = int(self.WindowWidth * 0.3)
-        top = int(self.WindowHeight * 0.49)
-        width = int(self.WindowWidth * 0.4)
-        height = int(self.WindowHeight * 0.24)
-        return (left, top, width, height)
-
-    # 右边 -> 不要
-    def getRightBuchuTextPos(self):
-        left = int(self.WindowWidth * 0.646)
-        top = int(self.WindowHeight * 0.43)
-        width = int(self.WindowWidth * 0.105)
-        height = int(self.WindowHeight * 0.112)
-        return (left, top, width, height)
-
-    # 左边 -> 不要
-    def getLeftBuchuTextPos(self):
-        left = int(self.WindowWidth * 0.245)
-        top = int(self.WindowHeight * 0.43)
-        width = int(self.WindowWidth * 0.105)
-        height = int(self.WindowHeight * 0.112)
-        return (left, top, width, height)
-    
-    # 我的 -> 不要
-    def getMyBuchuTextPos(self):
-        left = int(self.WindowWidth * 0.443)
-        top = int(self.WindowHeight * 0.576)
-        width = int(self.WindowWidth * 0.105)
-        height = int(self.WindowHeight * 0.112)
-        return (left, top, width, height)
-    
-    # 右边玩家剩余牌数
-    def getRightCardsNumPos(self):
-        left = int(self.WindowWidth * 0.772)
-        top = int(self.WindowHeight * 0.464)
-        width = int(self.WindowWidth * 0.042)
-        height = int(self.WindowHeight * 0.093)
-        return (left, top, width, height)
-
-    # 左边玩家剩余牌数
-    def getLeftCardsNumPos(self):
-        left = int(self.WindowWidth * 0.183)
-        top = int(self.WindowHeight * 0.464)
-        width = int(self.WindowWidth * 0.042)
-        height = int(self.WindowHeight * 0.093)
-        return (left, top, width, height)
-    
-    # 我的剩余牌数
-    def getMyCardsNumPos(self):
-        left = int(self.WindowWidth * 0.183)
-        top = int(self.WindowHeight * 0.464)
-        width = int(self.WindowWidth * 0.042)
-        height = int(self.WindowHeight * 0.093)
-        return (left, top, width, height)
-    
-    # 对局结果，包括 赢和输的标识 以及 输赢数量
-    def getGameResultPos(self):
-        left = int(self.WindowWidth * 0.73)
-        top = int(self.WindowHeight * 0.264)
-        width = int(self.WindowWidth * 0.167)
-        height = int(self.WindowHeight * 0.08)
-        return (left, top, width, height)
-
-    def getRightAnimation1Pos(self):
-        left = int(self.WindowWidth * 0.86)
-        top = int(self.WindowHeight * 0.19)
-        width = int(self.WindowWidth * 0.09)
-        height = int(self.WindowHeight * 0.0855)
+    def getCapturePosition2(self, areaName):
+        areaStr = self.ScreenshotAreas[areaName]
+        left, top, width, height = self.parse_and_calculate(areaStr)
         return (left, top, left + width, top + height)
-    
-    def getRightAnimation2Pos(self):
-        left = int(self.WindowWidth * 0.5)
-        top = int(self.WindowHeight * 0.195)
-        width = int(self.WindowWidth * 0.272)
-        height = int(self.WindowHeight * 0.13)
-        return (left, top, left + width, top + height)
-
-    def getLeftAnimation1Pos(self):
-        left = int(self.WindowWidth * 0.06)
-        top = int(self.WindowHeight * 0.19)
-        width = int(self.WindowWidth * 0.09)
-        height = int(self.WindowHeight * 0.0855)
-        return (left, top, left + width, top + height)
-    
-    def getLeftAnimation2Pos(self):
-        left = int(self.WindowWidth * 0.22)
-        top = int(self.WindowHeight * 0.195)
-        width = int(self.WindowWidth * 0.272)
-        height = int(self.WindowHeight * 0.13)
-        return (left, top, left + width, top + height)
-
-    def getMyPlayedAnimationPos(self):
-        left = int(self.WindowWidth * 0.3)
-        top = int(self.WindowHeight * 0.39)
-        width = int(self.WindowWidth * 0.25)
-        height = int(self.WindowHeight * 0.186)
-        return (left, top, left + width, top + height)
-
-    # # 要不起
-    # def getPassBtnPos(self):
-    #     left = int(self.WindowWidth * 0.48)
-    #     top = int(self.WindowHeight * 0.59)
-    #     width = int(self.WindowWidth * 0.11)
-    #     height = int(self.WindowHeight * 0.1)
-    #     return (left, top, width, height)
-    
-    # # 叫地主 or 抢地主
-    # def getCallLandlordBtnPos(self):
-    #     left = int(self.WindowWidth * 0.345)
-    #     top = int(self.WindowHeight * 0.595)
-    #     width = int(self.WindowWidth * 0.11)
-    #     height = int(self.WindowHeight * 0.1)
-    #     return (left, top, width, height)
-    
-    # # 不叫 or 不抢
-    # def getDoNotCallLandlordBtnPos(self):
-    #     left = int(self.WindowWidth * 0.545)
-    #     top = int(self.WindowHeight * 0.595)
-    #     width = int(self.WindowWidth * 0.11)
-    #     height = int(self.WindowHeight * 0.1)
-    #     return (left, top, width, height)
-    
-    # # 出牌
-    # def getPlayCardsBtnPos(self):
-    #     left = int(self.WindowWidth * 0.295)
-    #     top = int(self.WindowHeight * 0.59)
-    #     width = int(self.WindowWidth * 0.11)
-    #     height = int(self.WindowHeight * 0.1)
-    #     return (left, top, width, height)
-    
-    # # 不出
-    # def getDoNotPlayBtnPos(self):
-    #     left = int(self.WindowWidth * 0.48)
-    #     top = int(self.WindowHeight * 0.59)
-    #     width = int(self.WindowWidth * 0.11)
-    #     height = int(self.WindowHeight * 0.1)
-    #     return (left, top, width, height)
-
-    # # 对局结束后各个玩家输赢豆
-    # def getBeansRegionsPos(self):
-        # 我
-        # left1 = int(self.WindowWidth * 0.224)
-        # top1 = int(self.WindowHeight * 0.602)
-        # width1 = int(self.WindowWidth * 0.028)
-        # height1 = int(self.WindowHeight * 0.05)
-        # # 左
-        # left2 = int(self.WindowWidth * 0.226)
-        # top2 = int(self.WindowHeight * 0.268)
-        # width2 = int(self.WindowWidth * 0.028)
-        # height2 = int(self.WindowHeight * 0.05)
-        # # 右
-        # left3 = int(self.WindowWidth * 0.627)
-        # top3 = int(self.WindowHeight * 0.269)
-        # width3 = int(self.WindowWidth * 0.028)
-        # height3 = int(self.WindowHeight * 0.05)
-        # return [(left1, top1, width1, height1), (left2, top2, width2, height2), (left3, top3, width3, height3)]
