@@ -57,7 +57,7 @@ class WorkerThread(QThread):
         self.imageLocator = ImageLocator(self.screenHelper)
         self.gameHelper = GameHelper(self.imageLocator, self.screenHelper)
         self.worker_runing = False              # 线程是否在运行
-        self.play_cards_automatically = False   # 是否自动打牌（无需人为操作）
+        self.play_cards_automatically = True   # 是否自动打牌（无需人为操作）
         self.in_game_start_screen = False       # 是否进入开始游戏界面
         self.game_started = False               # 游戏是否已开局
         self.landlord_confirmed = False         # 是否已确认地主
@@ -82,6 +82,9 @@ class WorkerThread(QThread):
         self.left_play_completed = False        # 左侧玩家是否完成一次出牌
         self.my_play_completed = False          # 我是否完成一次出牌
         self.waiting_animation_to_end = False   # 是否正在等待动画结束
+
+        self.auto_bidding = False
+        self.auto_redouble = False
 
         self.model_path_dict = {
             'landlord': "baselines/resnet/resnet_landlord.ckpt",
@@ -139,6 +142,8 @@ class WorkerThread(QThread):
 
         self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
         while self.worker_runing and not self.in_game_start_screen:
+            if self.play_cards_automatically:
+                await self.gameHelper.clickBtn('quick_start_btn')
             print("等待手动进入开始游戏界面...")
             self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
             time.sleep(1)
@@ -152,6 +157,8 @@ class WorkerThread(QThread):
                 print("对局尚未开始")
 
             while self.worker_runing and not game_started:
+                if self.play_cards_automatically:
+                    await self.gameHelper.clickBtn('start_game_btn')
                 print("等待手动开始对局...")
                 game_started = await self.gameHelper.check_if_game_started()
                 time.sleep(1)
@@ -160,7 +167,10 @@ class WorkerThread(QThread):
             print("对局已开始")
             print()
             self.game_started = True
+
+            await self.autoBidding()
             await self.getThreeCards()
+            await self.autoRedouble()
 
     async def initial_data(self):
         self.data_initializing = True
@@ -254,9 +264,7 @@ class WorkerThread(QThread):
         while self.worker_runing and len(self.three_cards) != 3:
             self.three_cards = await self.gameHelper.get_three_cards()
             time.sleep(1)
-        
-        # 成功获取到三张底牌，意味着地主已确定 
-        self.landlord_confirmed = True
+
         self.three_cards_env = [RealCard2EnvCard[c] for c in list(self.three_cards)]
 
         print(f"三张底牌：{self.three_cards}")
@@ -454,6 +462,58 @@ class WorkerThread(QThread):
                 self.right_play_completed = False
                 self.my_play_done.clear()
                 self.right_play_done.set()
+
+    async def autoBidding(self):
+        if not self.play_cards_automatically:
+            return
+        
+        self.auto_bidding = True
+        score = 0.3
+        while self.worker_runing and self.auto_bidding:
+            if score > self.config.bidder_threshold:
+                call_success = await self.gameHelper.clickBtn('call_landlord_btn')
+                if call_success:
+                    continue
+                scramble_success = await self.gameHelper.clickBtn('scramble_landlord_btn')
+                if scramble_success:
+                    continue
+            else:
+                not_call_success = await self.gameHelper.clickBtn('not_call_landlord_btn')
+                if not_call_success:
+                    continue
+                not_scramble_success = await self.gameHelper.clickBtn('not_scramble_landlord_btn')
+                if not_scramble_success:
+                    continue
+
+            three_cards = await self.gameHelper.get_three_cards()
+            if len(three_cards) == 3:
+                self.auto_bidding = False
+            
+            time.sleep(0.2)
+
+    async def autoRedouble(self):
+        if not self.play_cards_automatically:
+            self.landlord_confirmed = True
+            return
+        
+        self.auto_redouble = True
+        score = 0.4
+        while self.worker_runing and self.auto_redouble:
+            success = False
+            if score > self.config.super_redouble_threshold:
+                success = await self.gameHelper.clickBtn('super_redouble_btn')
+                if not success:
+                    success = await self.gameHelper.clickBtn('redouble_btn')
+            elif score > self.config.redouble_threshold:
+                success = await self.gameHelper.clickBtn('redouble_btn')
+            else:
+                success = await self.gameHelper.clickBtn('not_redouble_btn')
+            
+            if success:
+                self.auto_redouble = False
+                self.landlord_confirmed = True
+
+            time.sleep(0.2)
 
     async def predict_to_bidding_score(self):
         success = False

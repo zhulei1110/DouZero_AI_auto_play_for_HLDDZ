@@ -39,5 +39,5 @@ class MainWindow(QMainWindow):
             self.workerThread.wait()
             self.button.setText("Start Thread")
 
-    def thread_finished(self):
-        self.button.setText("Start Thread")
+    # def thread_finished(self):
+    #     self.button.setText("Start Thread")

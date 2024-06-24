@@ -4,6 +4,7 @@ matplotlib~=3.7.3
 numpy~=1.23.5
 opencv-python~=4.9.0.80
 Pillow~=10.2.0
+pyautogui==0.9.54
 PyQt5~=5.15.9
 pywin32==306
 qasync==0.27.1

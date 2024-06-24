@@ -2,9 +2,9 @@
     "window_width": 1600,
     "window_height": 900,
     "window_class_name": "UnityWndClass",
-    "image_locate_logs": false,
+    "image_locate_logs": true,
     "dx_color_compare_logs": false,
-    "screenshot_logs": true,
+    "screenshot_logs": false,
     "screenshot_areas": {
         "quick_start_btn": "0.783333333,0.860185185,0.138020833,0.115740741",
         "chat_btn": "0.9046875,0.925,0.086979167,0.074074074",
@@ -43,20 +43,8 @@
         "my_played_animation": "0.35,0.419444444,0.29375,0.105555556",
         "game_result": "0.704166667,0.256481481,0.2015625,0.089814815"
     },
-    "bidder_thresholds": {
-        "bid1": 0.2,
-        "bid2": 0.4,
-        "bid3": 0.5
-    },
-    "redouble_thresholds": {
-        "landlord_1": 0.5,
-        "landlord_2": 0.4,
-        "landlord_robbed_1": 0.6,
-        "landlord_robbed_2": 0.5,
-        "farmer_1": 1.3,
-        "farmer_2": 1.1,
-        "farmer_low_1": 1.2,
-        "farmer_low_2": 1.0
-    },
-    "mingpai_threshold": 1.5
+    "bidder_threshold": 0.4,
+    "redouble_threshold": 0.7,
+    "super_redouble_threshold": 0.8,
+    "mingpai_threshold": 1.2
 }

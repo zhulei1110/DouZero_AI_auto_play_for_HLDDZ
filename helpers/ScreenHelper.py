@@ -1,9 +1,9 @@
 import asyncio
 import cv2
+import numpy as np
+import pyautogui
 import win32gui
 import win32ui
-
-import numpy as np
 
 from enum import Enum
 from concurrent.futures import ThreadPoolExecutor
@@ -55,6 +55,8 @@ class ScreenHelper:
         self.config = Config.load()
         self.BaseWidth = 1920
         self.BaseHeight = 1080
+        self.WindowLeft = 0
+        self.WindowTop = 0
         self.WindowWidth = self.config.window_width
         self.WindowHeight = self.config.window_height
         self.ScreenshotAreas = self.config.screenshot_areas
@@ -90,10 +92,14 @@ class ScreenHelper:
                 win32gui.SetActiveWindow(self.Handle)
                 gameWindow = self.Handle
 
-                left, top, right, bottom = win32gui.GetClientRect(gameWindow) 
+                left, top, right, bottom = win32gui.GetClientRect(gameWindow)
+                client_point = win32gui.ClientToScreen(gameWindow, (left, top))
+
+                self.WindowLeft = client_point[0]
+                self.WindowTop = client_point[1]
+
                 width = right - left
                 height = bottom - top
-
                 self.WindowWidth = width
                 self.WindowHeight = height
 
@@ -170,3 +176,12 @@ class ScreenHelper:
         areaStr = self.ScreenshotAreas[areaName]
         left, top, width, height = self.parse_and_calculate(areaStr)
         return (left, top, left + width, top + height)
+
+    def leftClick(self, rel_x, rel_y):
+        win32gui.SetActiveWindow(self.Handle)
+
+        abs_x = self.WindowLeft + rel_x + 10
+        abs_y = self.WindowTop + rel_y + 5
+
+        # 移动鼠标到指定位置并点击
+        pyautogui.click(abs_x, abs_y)

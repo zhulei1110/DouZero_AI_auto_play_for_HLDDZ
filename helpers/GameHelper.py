@@ -260,3 +260,12 @@ class GameHelper:
         pos = self.screenHelper.getCapturePosition(ScreenshotArea.MY_PLAYED_TEXT.value)
         result = await self.imageLocator.locate_match_on_screen(templateName=template, region=pos)
         return result
+    
+    async def clickBtn(self, btnName):
+        btnPos = self.screenHelper.getCapturePosition(areaName=btnName)
+        result = await self.imageLocator.locate_match_on_screen(templateName=btnName, region=btnPos, confidence=0.7)
+        if result is None:
+            return False
+        
+        self.screenHelper.leftClick(result[0], result[1])
+        return True
