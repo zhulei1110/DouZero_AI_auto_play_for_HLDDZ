@@ -48,7 +48,7 @@ def run_async_task_in_thread(loop, coro):
     loop.run_until_complete(coro)
 
 class WorkerThread(QThread):
-    finished_signal = pyqtSignal()
+    # finished_signal = pyqtSignal()
 
     def __init__(self):
         super(WorkerThread, self).__init__()
@@ -126,7 +126,7 @@ class WorkerThread(QThread):
             while self.worker_runing and self.data_initialized and not self.card_playing:
                 await self.run_game()
 
-            await asyncio.sleep(3)
+            await asyncio.sleep(1)
             
             print()
             print("----- WORKER FINISHED -----")
@@ -141,7 +141,7 @@ class WorkerThread(QThread):
         while self.worker_runing and not self.in_game_start_screen:
             print("等待手动进入开始游戏界面...")
             self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
-            time.sleep(1.2)
+            time.sleep(1)
 
         game_started = False
         if self.in_game_start_screen:
@@ -154,7 +154,7 @@ class WorkerThread(QThread):
             while self.worker_runing and not game_started:
                 print("等待手动开始对局...")
                 game_started = await self.gameHelper.check_if_game_started()
-                time.sleep(1.2)
+                time.sleep(1)
         
         if game_started:
             print("对局已开始")
@@ -175,7 +175,7 @@ class WorkerThread(QThread):
 
         self.play_order = 0 if self.my_position == "landlord" else 1 if self.my_position == "landlord_up" else 2
         playOrderArr = ['我先出牌', '我的下家先出牌', '我的上家先出牌']
-        print('本局出牌顺序: ', playOrderArr[self.play_order])
+        print('出牌顺序: ', playOrderArr[self.play_order])
         print()
 
         self.data_initialized = True
@@ -214,7 +214,7 @@ class WorkerThread(QThread):
                 print('本轮对局已结束')
                 print()
 
-            time.sleep(2)
+            time.sleep(1)
         
         # 等待所有线程完成
         thread_my.join()
@@ -253,7 +253,7 @@ class WorkerThread(QThread):
 
         while self.worker_runing and len(self.three_cards) != 3:
             self.three_cards = await self.gameHelper.get_three_cards()
-            time.sleep(1.2)
+            time.sleep(1)
         
         # 成功获取到三张底牌，意味着地主已确定 
         self.landlord_confirmed = True
@@ -267,7 +267,7 @@ class WorkerThread(QThread):
 
         while self.worker_runing and self.my_position_code is None:
             self.my_position_code = await self.gameHelper.get_my_position()
-            time.sleep(0.2)
+            time.sleep(0.5)
 
         self.my_position = PlayerPosition[self.my_position_code]
 
@@ -330,7 +330,6 @@ class WorkerThread(QThread):
                 break
 
             if self.right_play_completed:
-                time.sleep(0.6)
                 continue
 
             if self.waiting_animation_to_end:
@@ -341,7 +340,7 @@ class WorkerThread(QThread):
                 self.waiting_animation_to_end = True
                 print('等待右侧动画结束...')
                 print()
-                time.sleep(0.5)
+                time.sleep(0.6)
 
             self.waiting_animation_to_end = False
             rightBuchu = None
@@ -352,9 +351,9 @@ class WorkerThread(QThread):
             rightPlayedCards = await self.gameHelper.get_right_played_cards()
 
             if rightBuchu is not None:
-                time.sleep(0.4)
                 print("右侧玩家 >>> 不出牌")
                 print()
+                time.sleep(0.3)
             
             rightPlayed = rightPlayedCards is not None and len(rightPlayedCards) > 0
             if rightPlayed:
@@ -375,7 +374,6 @@ class WorkerThread(QThread):
                 break
 
             if self.left_play_completed:
-                time.sleep(0.6)
                 continue
 
             if self.waiting_animation_to_end:
@@ -386,7 +384,7 @@ class WorkerThread(QThread):
                 self.waiting_animation_to_end = True
                 print('等待左侧动画结束...')
                 print()
-                time.sleep(0.5)
+                time.sleep(0.6)
             
             self.waiting_animation_to_end = False
             leftBuchu = None
@@ -397,9 +395,9 @@ class WorkerThread(QThread):
             leftPlayedCards = await self.gameHelper.get_left_played_cards()
 
             if leftBuchu is not None:
-                time.sleep(0.4)
                 print("左侧玩家 >>> 不出牌")
                 print()
+                time.sleep(0.3)
             
             leftPlayed = leftPlayedCards is not None and len(leftPlayedCards) > 0
             if leftPlayed:
@@ -420,7 +418,6 @@ class WorkerThread(QThread):
                 break
 
             if self.my_play_completed:
-                time.sleep(0.6)
                 continue
 
             if self.waiting_animation_to_end:
@@ -431,7 +428,7 @@ class WorkerThread(QThread):
                 self.waiting_animation_to_end = True
                 print('等待我的动画结束...')
                 print()
-                time.sleep(0.5)
+                time.sleep(0.6)
 
             self.waiting_animation_to_end = False
             myBuchu = None
@@ -442,9 +439,9 @@ class WorkerThread(QThread):
             myPlayedCards = await self.gameHelper.get_my_played_cards()
 
             if myBuchu is not None:
-                time.sleep(0.4)
                 print("我 >>> 不出牌")
                 print()
+                time.sleep(0.3)
             
             myPlayed = myPlayedCards is not None and len(myPlayedCards) > 0
             if myPlayed:
