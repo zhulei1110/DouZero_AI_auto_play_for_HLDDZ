@@ -1,12 +1,9 @@
 import os
-import time
 
 import torch
 import torch.nn.functional as F
 
 from torch import nn
-from torch.utils.data import DataLoader
-from torch.utils.data.dataset import Dataset
 
 
 # 将环境中的卡牌列表转换为 Onehot 编码
@@ -50,6 +47,7 @@ class Net2(nn.Module):
         x = F.leaky_relu(self.dense3(x))
         x = F.leaky_relu(self.dense4(x))
         x = self.dense5(x)
+        x = torch.sigmoid(x)  # 在最后一层添加 Sigmoid 激活函数
         return x
 
 
@@ -79,7 +77,7 @@ class Net(nn.Module):
 
 # 初始化模型并检查是否使用 GPU，如果有权重文件，则加载这些权重
 UseGPU = False
-device = torch.device('cuda:0')
+device = torch.device('cuda:0' if UseGPU and torch.cuda.is_available() else 'cpu')
 
 net = Net()
 net2 = Net2()
@@ -110,6 +108,9 @@ def predict(cards):
 
 # predict_score 函数将卡牌转换为 Onehot 编码，并使用 Net2 模型预测得分
 def predict_score(cards):
+    if len(cards) == 0 or cards is None:
+        return 0
+    
     input = RealToOnehot(cards)
     if UseGPU:
         input = input.to(device)
@@ -119,5 +120,5 @@ def predict_score(cards):
     return result[0].item()
 
 if __name__ == "__main__":
-    print(predict_score("333444569TTJJQKK2"))
-    print(predict_score("33344456789TJQKDX"))
+    print(predict_score("X2AKQJJ8777655443"))
+    print(predict_score("X2AAQJ99887765553"))

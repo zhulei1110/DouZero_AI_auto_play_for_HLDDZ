@@ -1,12 +1,9 @@
 import os
-import time
 
 import torch
 import torch.nn.functional as F
 
 from torch import nn
-from torch.utils.data import DataLoader
-from torch.utils.data.dataset import Dataset
 
 
 # 这个函数将一组卡牌转换为 one-hot 编码
@@ -57,6 +54,7 @@ class Net(nn.Module):
         x = F.leaky_relu(self.dense3(x))
         x = F.leaky_relu(self.dense4(x))
         x = self.dense5(x)
+        x = torch.sigmoid(x)  # 在 forward 函数中添加 Sigmoid
         return x
 
 
@@ -85,6 +83,9 @@ if os.path.exists("./weights/farmer_weights.pkl"):
 
 
 def predict(cards, type="up"):
+    if len(cards) == 0 or cards is None:
+        return 0
+    
     net = Nets[type]
     x = torch.flatten(RealToOnehot(cards))
     x = x.unsqueeze(0)
@@ -92,10 +93,7 @@ def predict(cards, type="up"):
     y = y.squeeze().item()
     return y
 
-
-def normalize_score(score, min_val=-5, max_val=5):
-    """将模型得分归一化到0-100的范围"""
-    return 100 * (score - min_val) / (max_val - min_val)
-
 if __name__ == "__main__":
-    print(normalize_score(predict("33334444555567", "farmer")))
+    print(predict("XAAKQJ98886654433", "up"))
+    print(predict("X2AAKQTT876644333", "down"))
+    print(predict("X2AAQJ99887765553", "farmer"))

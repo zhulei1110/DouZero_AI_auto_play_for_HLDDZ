@@ -9,7 +9,7 @@ from helpers.GameHelper import GameHelper, AnimationArea
 from helpers.ImageLocator import ImageLocator
 from helpers.ScreenHelper import ScreenHelper
 
-from models import BiddingModel
+from models import BidModel
 from models import FarmerModel
 from models import LandlordModel
 
@@ -82,7 +82,7 @@ class WorkerThread(QThread):
         self.left_play_completed = False        # 左侧玩家是否完成一次出牌
         self.my_play_completed = False          # 我是否完成一次出牌
         self.waiting_animation_to_end = False   # 是否正在等待动画结束
-
+        self.round_count = 0
         self.auto_bidding = False
         self.auto_redouble = False
 
@@ -170,13 +170,12 @@ class WorkerThread(QThread):
 
             await self.autoBidding()
             await self.getThreeCards()
+            await self.getMyPosition()
+            await self.getMyHandCards()
             await self.autoRedouble()
 
     async def initial_data(self):
         self.data_initializing = True
-
-        await self.getMyPosition()
-        await self.getMyHandCards()
 
         print("正在处理本次牌局数据...")
         self.initOtherPlayerHandCards()
@@ -187,6 +186,10 @@ class WorkerThread(QThread):
         playOrderArr = ['我先出牌', '我的下家先出牌', '我的上家先出牌']
         print('出牌顺序: ', playOrderArr[self.play_order])
         print()
+
+        if self.round_count == 0:
+            self.create_ai_representer()
+        self.env.card_play_init(self.all_player_card_data)
 
         self.data_initialized = True
         self.data_initializing = False
@@ -209,6 +212,10 @@ class WorkerThread(QThread):
         thread_left.start()
         thread_my.start()
 
+        action_message, action_list = self.env.step(self.my_position, update=False)
+        print('action_message: ', action_message)
+        print('action_list: ', action_list)
+
         if self.play_order == 0:        # 顺序：我 --> 右边玩家 --> 左边玩家
             self.my_play_done.set()
         elif self.play_order == 1:      # 顺序：右边玩家 --> 左边玩家 --> 我
@@ -220,7 +227,9 @@ class WorkerThread(QThread):
             # print('正在检测对局是否结束...')
             game_overed = await self.gameHelper.check_if_game_overed()
             if game_overed:
+                self.round_count += 1
                 self.reset_status()
+                self.reset_ai_env()
                 print('本轮对局已结束')
                 print()
 
@@ -255,6 +264,7 @@ class WorkerThread(QThread):
 
     def stop_task(self):
         self.worker_runing = False
+        self.round_count = 0
         self.reset_status()
         print("正在停止工作线程...")
     
@@ -263,7 +273,7 @@ class WorkerThread(QThread):
 
         while self.worker_runing and len(self.three_cards) != 3:
             self.three_cards = await self.gameHelper.get_three_cards()
-            time.sleep(1)
+            time.sleep(0.2)
 
         self.three_cards_env = [RealCard2EnvCard[c] for c in list(self.three_cards)]
 
@@ -275,7 +285,7 @@ class WorkerThread(QThread):
 
         while self.worker_runing and self.my_position_code is None:
             self.my_position_code = await self.gameHelper.get_my_position()
-            time.sleep(0.5)
+            time.sleep(0.2)
 
         self.my_position = PlayerPosition[self.my_position_code]
 
@@ -331,7 +341,7 @@ class WorkerThread(QThread):
                 self.other_player_cards[0:17] if (self.my_position_code + 1) % 3 == 1 else self.other_player_cards[17:]
         })
 
-    async def getRightPlayedCards(self, first=False):
+    async def getRightPlayedCards(self):
         while self.worker_runing and self.card_playing:
             self.right_play_done.wait()
             if not self.card_playing:
@@ -351,11 +361,8 @@ class WorkerThread(QThread):
                 time.sleep(0.6)
 
             self.waiting_animation_to_end = False
-            rightBuchu = None
-            rightPlayedCards = None
-
-            if not first:
-                rightBuchu = await self.gameHelper.get_right_played_text(template='buchu')
+            
+            rightBuchu = await self.gameHelper.get_right_played_text(template='buchu')
             rightPlayedCards = await self.gameHelper.get_right_played_cards()
 
             if rightBuchu is not None:
@@ -375,7 +382,7 @@ class WorkerThread(QThread):
                 self.right_play_done.clear()
                 self.left_play_done.set()
 
-    async def getLeftPlayedCards(self, first=False):
+    async def getLeftPlayedCards(self):
         while self.worker_runing and self.card_playing:
             self.left_play_done.wait()
             if not self.card_playing:
@@ -395,11 +402,8 @@ class WorkerThread(QThread):
                 time.sleep(0.6)
             
             self.waiting_animation_to_end = False
-            leftBuchu = None
-            leftPlayedCards = None
             
-            if not first:
-                leftBuchu = await self.gameHelper.get_left_played_text(template='buchu')
+            leftBuchu = await self.gameHelper.get_left_played_text(template='buchu')
             leftPlayedCards = await self.gameHelper.get_left_played_cards()
 
             if leftBuchu is not None:
@@ -419,7 +423,7 @@ class WorkerThread(QThread):
                 self.left_play_done.clear()
                 self.my_play_done.set()
     
-    async def getMyPlayedCards(self, first=False):
+    async def getMyPlayedCards(self):
         while self.worker_runing and self.card_playing:
             self.my_play_done.wait()
             if not self.card_playing:
@@ -439,11 +443,8 @@ class WorkerThread(QThread):
                 time.sleep(0.6)
 
             self.waiting_animation_to_end = False
-            myBuchu = None
-            myPlayedCards = None
             
-            if not first:
-                myBuchu = await self.gameHelper.get_my_played_text(template='buchu')
+            myBuchu = await self.gameHelper.get_my_played_text(template='buchu')
             myPlayedCards = await self.gameHelper.get_my_played_cards()
 
             if myBuchu is not None:
@@ -468,9 +469,9 @@ class WorkerThread(QThread):
             return
         
         self.auto_bidding = True
-        score = 0.3
+        win_rate = await self.get_bid_win_rate()
         while self.worker_runing and self.auto_bidding:
-            if score > self.config.bidder_threshold:
+            if win_rate > self.config.bid_threshold:
                 call_success = await self.gameHelper.clickBtn('call_landlord_btn')
                 if call_success:
                     continue
@@ -497,14 +498,14 @@ class WorkerThread(QThread):
             return
         
         self.auto_redouble = True
-        score = 0.4
+        win_rate = await self.get_game_win_rate()
         while self.worker_runing and self.auto_redouble:
             success = False
-            if score > self.config.super_redouble_threshold:
+            if win_rate > self.config.super_redouble_threshold:
                 success = await self.gameHelper.clickBtn('super_redouble_btn')
                 if not success:
                     success = await self.gameHelper.clickBtn('redouble_btn')
-            elif score > self.config.redouble_threshold:
+            elif win_rate > self.config.redouble_threshold:
                 success = await self.gameHelper.clickBtn('redouble_btn')
             else:
                 success = await self.gameHelper.clickBtn('not_redouble_btn')
@@ -515,35 +516,49 @@ class WorkerThread(QThread):
 
             time.sleep(0.2)
 
-    async def predict_to_bidding_score(self):
-        success = False
-        my_hand_cards = await self.gameHelper.get_my_hand_cards()
-        while self.worker_runing and len(self.my_hand_cards) != 17 and not success:
-            my_hand_cards = await self.gameHelper.get_my_hand_cards()
-            success = len(my_hand_cards) == 17
-            time.sleep(0.2)
-
-        if success:
-            bidScore = BiddingModel.predict_score(self.my_hand_cards)
-            print(f"预测叫地主胜率：{str(round(bidScore, 3))}")
-            print()
-
-            notBidScore = FarmerModel.predict(self.my_hand_cards, "farmer")
-            print(f"预测不叫地主胜率：{str(round(notBidScore, 3))}")
-            print()
-
-    async def predict_to_current_round_score(self):
-        if self.my_position_code == 1:
-            win_rate = LandlordModel.predict_by_model(self.my_hand_cards, self.three_cards)
-            print("本局我是地主，预测胜率：", round(win_rate, 3))
-            print()
-        else:
-            win_rate = FarmerModel.predict(self.my_hand_cards, "up")
-            print("本局我是农民，预测胜率：", round(win_rate, 3))
-            print()
-
-    def creating_an_AI_to_represent_the_player(self):
+    def create_ai_representer(self):
         AI = [0, 0]
         AI[0] = self.my_position
         AI[1] = DeepAgent(self.my_position, self.model_path_dict[self.my_position])
         self.env = GameEnv(AI)
+
+    def reset_ai_env(self):
+        if self.env is not None:
+            self.env.game_over = True
+            self.env.reset()
+
+    async def get_bid_win_rate(self):
+        success = False
+        my_hand_cards = await self.gameHelper.get_my_hand_cards()
+        while self.worker_runing and len(my_hand_cards) != 17 and not success:
+            my_hand_cards = await self.gameHelper.get_my_hand_cards()
+            success = len(my_hand_cards) == 17
+            time.sleep(0.2)
+
+        notBidScore = FarmerModel.predict(my_hand_cards, "farmer")
+        print(f"预测不叫地主胜率：{str(round(notBidScore, 3))}")
+        print()
+
+        result = BidModel.predict_score(my_hand_cards)
+        print(f"预测叫地主胜率：{str(round(result, 3))}")
+        print()
+
+        win_rate = round(result, 3)
+        return win_rate
+
+    async def get_game_win_rate(self):
+        if self.my_position_code == 1:
+            result = LandlordModel.predict_by_model(self.my_hand_cards, self.three_cards)
+            print("本局我是地主，预测胜率：", round(result, 3))
+            print()
+        elif self.my_position_code == 2:
+            result = FarmerModel.predict(self.my_hand_cards, "down")
+            print("本局我是农民（地主下家），预测胜率：", round(result, 3))
+            print()
+        else:
+            result = FarmerModel.predict(self.my_hand_cards, "up")
+            print("本局我是农民（地主上家），预测胜率：", round(result, 3))
+            print()
+        
+        win_rate = round(result, 3)
+        return win_rate
