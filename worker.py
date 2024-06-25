@@ -15,7 +15,7 @@ from models import LandlordModel
 
 from douzero.env.game_new import GameEnv
 from douzero.env.move_detector import get_move_type
-from douzero.evaluation.deep_agent import DeepAgent
+from douzero.evaluation.deep_agent_new import DeepAgent
 
 from utils import normalize_score
 
@@ -43,9 +43,9 @@ Bombs = [[3, 3, 3, 3],
          [17, 17, 17, 17],
          [20, 30]]
 
-def run_async_task_in_thread(loop, coro):
+def run_async_task_in_thread(loop, future):
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(coro)
+    loop.run_until_complete(future)
 
 class WorkerThread(QThread):
     # finished_signal = pyqtSignal()
@@ -75,13 +75,13 @@ class WorkerThread(QThread):
         self.other_player_cards = None          # 其他玩家的手牌（整副牌减去我的手牌，后续再减掉历史出牌）
         self.other_player_cards_str = None
         self.all_player_card_data = None
-        self.right_play_done = threading.Event()
-        self.left_play_done = threading.Event()
-        self.my_play_done = threading.Event()
-        self.right_play_completed = False       # 右侧玩家是否完成一次出牌
-        self.left_play_completed = False        # 左侧玩家是否完成一次出牌
-        self.my_play_completed = False          # 我是否完成一次出牌
-        self.waiting_animation_to_end = False   # 是否正在等待动画结束
+        self.right_played_event = threading.Event()
+        self.left_played_event = threading.Event()
+        self.my_played_event = threading.Event()
+        self.right_played_completed = False         # 右侧玩家是否完成一次出牌
+        self.left_played_completed = False          # 左侧玩家是否完成一次出牌
+        self.my_played_completed = False            # 我是否完成一次出牌
+        self.waiting_for_animation_to_end = False   # 是否正在等待动画结束
         self.round_count = 0
         self.auto_bidding = False
         self.auto_redouble = False
@@ -199,29 +199,29 @@ class WorkerThread(QThread):
         print()
         self.card_playing = True
 
-        thread_right_loop = asyncio.new_event_loop()
-        thread_right = threading.Thread(target=run_async_task_in_thread, args=(thread_right_loop, self.getRightPlayedCards()))
+        right_loop = asyncio.new_event_loop()
+        right_thread = threading.Thread(target=run_async_task_in_thread, args=(right_loop, self.getRightPlayedCards()))
 
-        thread_left_loop = asyncio.new_event_loop()
-        thread_left = threading.Thread(target=run_async_task_in_thread, args=(thread_left_loop, self.getLeftPlayedCards()))
+        left_loop = asyncio.new_event_loop()
+        left_thread = threading.Thread(target=run_async_task_in_thread, args=(left_loop, self.getLeftPlayedCards()))
 
-        thread_my_loop = asyncio.new_event_loop()
-        thread_my = threading.Thread(target=run_async_task_in_thread, args=(thread_my_loop, self.getMyPlayedCards()))
+        my_loop = asyncio.new_event_loop()
+        my_thread = threading.Thread(target=run_async_task_in_thread, args=(my_loop, self.getMyPlayedCards()))
 
-        thread_right.start()
-        thread_left.start()
-        thread_my.start()
+        right_thread.start()
+        left_thread.start()
+        my_thread.start()
 
-        action_message, action_list = self.env.step(self.my_position, update=False)
-        print('action_message: ', action_message)
-        print('action_list: ', action_list)
+        # action_message, action_list = self.env.step(self.my_position, update=False)
+        # print('action_message: ', action_message)
+        # print('action_list: ', action_list)
 
         if self.play_order == 0:        # 顺序：我 --> 右边玩家 --> 左边玩家
-            self.my_play_done.set()
+            self.my_played_event.set()
         elif self.play_order == 1:      # 顺序：右边玩家 --> 左边玩家 --> 我
-            self.right_play_done.set()
+            self.right_played_event.set()
         elif self.play_order == 2:      # 顺序：左边玩家 --> 我 --> 右边玩家
-            self.left_play_done.set()
+            self.left_played_event.set()
 
         while self.worker_runing and self.card_playing:
             # print('正在检测对局是否结束...')
@@ -236,9 +236,9 @@ class WorkerThread(QThread):
             time.sleep(1)
         
         # 等待所有线程完成
-        thread_my.join()
-        thread_right.join()
-        thread_left.join()
+        my_thread.join()
+        right_thread.join()
+        left_thread.join()
 
     def reset_status(self):
         self.in_game_start_screen = False
@@ -258,9 +258,9 @@ class WorkerThread(QThread):
         self.other_player_cards_str = None
         self.all_player_card_data = None
 
-        self.my_play_done.set()
-        self.right_play_done.set()
-        self.left_play_done.set()
+        self.my_played_event.set()
+        self.right_played_event.set()
+        self.left_played_event.set()
 
     def stop_task(self):
         self.worker_runing = False
@@ -343,24 +343,24 @@ class WorkerThread(QThread):
 
     async def getRightPlayedCards(self):
         while self.worker_runing and self.card_playing:
-            self.right_play_done.wait()
+            self.right_played_event.wait()
             if not self.card_playing:
                 break
 
-            if self.right_play_completed:
+            if self.right_played_completed:
                 continue
 
-            if self.waiting_animation_to_end:
+            if self.waiting_for_animation_to_end:
                 continue
 
             haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.RIGHT_PLAYED_ANIMATION.value)
             if haveAnimation:
-                self.waiting_animation_to_end = True
+                self.waiting_for_animation_to_end = True
                 print('等待右侧动画结束...')
                 print()
                 time.sleep(0.6)
 
-            self.waiting_animation_to_end = False
+            self.waiting_for_animation_to_end = False
             
             rightBuchu = await self.gameHelper.get_right_played_text(template='buchu')
             rightPlayedCards = await self.gameHelper.get_right_played_cards()
@@ -377,31 +377,31 @@ class WorkerThread(QThread):
                 time.sleep(0.3)
         
             if rightBuchu is not None or rightPlayed:
-                self.right_play_completed = True
-                self.left_play_completed = False
-                self.right_play_done.clear()
-                self.left_play_done.set()
+                self.right_played_completed = True
+                self.left_played_completed = False
+                self.right_played_event.clear()
+                self.left_played_event.set()
 
     async def getLeftPlayedCards(self):
         while self.worker_runing and self.card_playing:
-            self.left_play_done.wait()
+            self.left_played_event.wait()
             if not self.card_playing:
                 break
 
-            if self.left_play_completed:
+            if self.left_played_completed:
                 continue
 
-            if self.waiting_animation_to_end:
+            if self.waiting_for_animation_to_end:
                 continue
 
             haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.LEFT_PLAYED_ANIMATION.value)
             if haveAnimation:
-                self.waiting_animation_to_end = True
+                self.waiting_for_animation_to_end = True
                 print('等待左侧动画结束...')
                 print()
                 time.sleep(0.6)
             
-            self.waiting_animation_to_end = False
+            self.waiting_for_animation_to_end = False
             
             leftBuchu = await self.gameHelper.get_left_played_text(template='buchu')
             leftPlayedCards = await self.gameHelper.get_left_played_cards()
@@ -418,31 +418,35 @@ class WorkerThread(QThread):
                 time.sleep(0.3)
             
             if leftBuchu is not None or leftPlayed:
-                self.left_play_completed = True
-                self.my_play_completed = False
-                self.left_play_done.clear()
-                self.my_play_done.set()
+                self.left_played_completed = True
+                self.my_played_completed = False
+                self.left_played_event.clear()
+                self.my_played_event.set()
     
     async def getMyPlayedCards(self):
         while self.worker_runing and self.card_playing:
-            self.my_play_done.wait()
+            self.my_played_event.wait()
             if not self.card_playing:
                 break
 
-            if self.my_play_completed:
+            if self.my_played_completed:
                 continue
 
-            if self.waiting_animation_to_end:
+            if self.waiting_for_animation_to_end:
                 continue
+
+            # action_message, action_list = self.env.step(self.my_position, update=False)
+            # print(f'action_message: {action_message}')
+            # print(f'action_list: {action_list}')
 
             haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.MY_PLAYED_ANIMATION.value)
             if haveAnimation:
-                self.waiting_animation_to_end = True
+                self.waiting_for_animation_to_end = True
                 print('等待我的动画结束...')
                 print()
                 time.sleep(0.6)
 
-            self.waiting_animation_to_end = False
+            self.waiting_for_animation_to_end = False
             
             myBuchu = await self.gameHelper.get_my_played_text(template='buchu')
             myPlayedCards = await self.gameHelper.get_my_played_cards()
@@ -459,10 +463,10 @@ class WorkerThread(QThread):
                 time.sleep(0.3)
 
             if (myBuchu is not None) or myPlayed:
-                self.my_play_completed = True
-                self.right_play_completed = False
-                self.my_play_done.clear()
-                self.right_play_done.set()
+                self.my_played_completed = True
+                self.right_played_completed = False
+                self.my_played_event.clear()
+                self.right_played_event.set()
 
     async def autoBidding(self):
         if not self.play_cards_automatically:
