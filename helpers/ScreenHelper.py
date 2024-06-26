@@ -112,14 +112,14 @@ class ScreenHelper:
                     image = image.crop((region[0], region[1], region[0] + region[2], region[1] + region[3]))
 
                 # 图片日志
-                if self.config.screenshot_logs:
-                    imageKey = self.compute_image_unique_key(image)
+                if self.config.screenshot_image_logs:
+                    uniqueKey = self.compute_image_unique_key(image)
                     saveImage = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
                     if region is not None:
                         regionText = str(region).replace(' ', '').replace(',', '-')
-                        cv2.imwrite(f'screenshots/logs/{imageKey}_{regionText}.png', saveImage)
+                        cv2.imwrite(f'screenshots/logs/s_{uniqueKey}_{regionText}.png', saveImage)
                     else:
-                        cv2.imwrite(f'screenshots/logs/{imageKey}_no_region.png', saveImage)
+                        cv2.imwrite(f'screenshots/logs/s_{uniqueKey}_no_region.png', saveImage)
 
                 if result:
                     success = True

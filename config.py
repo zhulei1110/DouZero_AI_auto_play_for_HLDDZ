@@ -5,9 +5,10 @@ class Config:
     window_width: int
     window_height: int
     window_class_name: str
-    dx_color_compare_logs: bool
-    image_locate_logs: bool
-    screenshot_logs: bool
+    screenshot_image_logs: bool
+    template_match_image_logs: bool
+    animation_image_compare_logs: bool
+    king_color_compare_image_logs: bool
     screenshot_areas: dict[str, str]
     bid_threshold: float
     redouble_threshold: float
@@ -18,9 +19,10 @@ class Config:
         self.window_width = kwargs.get('window_width', 1600)
         self.window_height = kwargs.get('window_height', 900)
         self.window_class_name = kwargs.get('window_class_name', '')
-        self.dx_color_compare_logs = kwargs.get('dx_color_compare_logs', False)
-        self.image_locate_logs = kwargs.get('image_locate_logs', False)
-        self.screenshot_logs = kwargs.get('screenshot_logs', False)
+        self.screenshot_image_logs = kwargs.get('screenshot_image_logs', False)
+        self.template_match_image_logs = kwargs.get('template_match_image_logs', False)
+        self.animation_image_compare_logs = kwargs.get('animation_image_compare_logs', False)
+        self.king_color_compare_image_logs = kwargs.get('king_color_compare_image_logs', False)
         self.screenshot_areas = kwargs.get('screenshot_areas', {})
         self.bid_threshold = kwargs.get('bid_threshold', 0.4)
         self.redouble_threshold = kwargs.get('redouble_threshold', 0.7)

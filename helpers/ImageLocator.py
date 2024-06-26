@@ -56,19 +56,17 @@ class ImageLocator:
             image = image[y:y + h, x:x + w]
 
             # 图片日志
-            if self.config.image_locate_logs:
-                imageKey = self.screenHelper.compute_image_unique_key(image)
-                regionText = str(region).replace(' ', '').replace(',', '-')
-                cv2.imwrite(f'screenshots/logs/LAM_{templateName}_{regionText}_{imageKey}.png', image)
+            if self.config.template_match_image_logs:
+                uniqueKey = self.screenHelper.compute_image_unique_key(image)
+                cv2.imwrite(f'screenshots/logs/t_m_all_{templateName}_{uniqueKey}.png', image)
 
         image_w, image_h = image.shape[1], image.shape[0]
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
-        if self.config.image_locate_logs:
-            templateKey = self.screenHelper.compute_image_unique_key(template)
+        if self.config.template_match_image_logs:
             scaleText = f"{scale:.{4}f}".replace('.', '-')
-            cv2.imwrite(f'screenshots/logs/LAM_{templateName}_{regionText}_{scaleText}_{templateKey}.png', template)
+            cv2.imwrite(f'screenshots/logs/t_m_all_{templateName}_{uniqueKey}_{scaleText}.png', template)
 
         # 使用 OpenCV 的 matchTemplate 函数在 image 中搜索 template
         # cv2.TM_CCOEFF_NORMED 是一种匹配方法，返回一个结果矩阵 res，其中每个值表示模板与图像对应位置的匹配程度
@@ -105,18 +103,16 @@ class ImageLocator:
             image = image[y:y + h, x:x + w, :]
 
             # 图片日志
-            if self.config.image_locate_logs:
-                imageKey = self.screenHelper.compute_image_unique_key(image)
-                regionText = str(region).replace(' ', '').replace(',', '-')
-                cv2.imwrite(f'screenshots/logs/LFM_{templateName}_{regionText}_{imageKey}.png', image)
+            if self.config.template_match_image_logs:
+                uniqueKey = self.screenHelper.compute_image_unique_key(image)
+                cv2.imwrite(f'screenshots/logs/t_m_first_{templateName}_{uniqueKey}.png', image)
 
         template = cv2.resize(template, None, fx=scale, fy=scale)
 
         # 图片日志
-        if self.config.image_locate_logs:
-            templateKey = self.screenHelper.compute_image_unique_key(template)
+        if self.config.template_match_image_logs:
             scaleText = f"{scale:.{4}f}".replace('.', '-')
-            cv2.imwrite(f'screenshots/logs/LFM_{templateName}_{regionText}_{scaleText}_{templateKey}.png', template)
+            cv2.imwrite(f'screenshots/logs/t_m_first_{templateName}_{uniqueKey}_{scaleText}.png', template)
 
         res = cv2.matchTemplate(image, template, cv2.TM_CCOEFF_NORMED)
         # print(f'res: {res}')

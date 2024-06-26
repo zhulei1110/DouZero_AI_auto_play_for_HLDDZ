@@ -2,9 +2,10 @@
     "window_width": 1600,
     "window_height": 900,
     "window_class_name": "UnityWndClass",
-    "dx_color_compare_logs": false,
-    "image_locate_logs": false,
-    "screenshot_logs": false,
+    "screenshot_image_logs": false,
+    "template_match_image_logs": false,
+    "animation_image_compare_logs": true,
+    "king_color_compare_image_logs": false,
     "screenshot_areas": {
         "quick_start_btn": "0.783333333,0.860185185,0.138020833,0.115740741",
         "chat_btn": "0.9046875,0.925,0.086979167,0.074074074",

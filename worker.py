@@ -69,22 +69,22 @@ class WorkerThread(QThread):
         self.data_initializing = False          # 是否正在初始化数据（执行 initial_data 函数）
         self.data_initialized = False           # 是否完成数据初始化
         self.play_order = None                  # 出牌顺序（0：我先出牌，1：我的下家先出牌，2：我的上家先出牌）
+        self.play_order_of_next = None          # 下一次出牌顺序（0：我，1：我的下家，2：我的上家）
         self.card_playing = False               # 是否在出牌中（已经有人出过牌为 true 否则 false）
         self.my_hand_cards = ''                 # 我的手牌
         self.my_hand_cards_env = None
         self.other_player_cards = None          # 其他玩家的手牌（整副牌减去我的手牌，后续再减掉历史出牌）
         self.other_player_cards_str = None
         self.all_player_card_data = None
-        self.right_played_event = threading.Event()
-        self.left_played_event = threading.Event()
-        self.my_played_event = threading.Event()
+
         self.right_played_completed = False         # 右侧玩家是否完成一次出牌
         self.left_played_completed = False          # 左侧玩家是否完成一次出牌
         self.my_played_completed = False            # 我是否完成一次出牌
         self.waiting_for_animation_to_end = False   # 是否正在等待动画结束
+
+        self.auto_bidding_in_progress = False
+        self.auto_redouble_in_progress = False
         self.round_count = 0
-        self.auto_bidding = False
-        self.auto_redouble = False
 
         self.model_path_dict = {
             'landlord': "baselines/resnet/resnet_landlord.ckpt",
@@ -198,33 +198,45 @@ class WorkerThread(QThread):
         print('准备就绪，玩家开始出牌...')
         print()
         self.card_playing = True
+        self.play_order_of_next = self.play_order
 
-        right_loop = asyncio.new_event_loop()
-        right_thread = threading.Thread(target=run_async_task_in_thread, args=(right_loop, self.getRightPlayedCards()))
-
-        left_loop = asyncio.new_event_loop()
-        left_thread = threading.Thread(target=run_async_task_in_thread, args=(left_loop, self.getLeftPlayedCards()))
-
-        my_loop = asyncio.new_event_loop()
-        my_thread = threading.Thread(target=run_async_task_in_thread, args=(my_loop, self.getMyPlayedCards()))
-
-        right_thread.start()
-        left_thread.start()
-        my_thread.start()
-
-        # action_message, action_list = self.env.step(self.my_position, update=False)
-        # print('action_message: ', action_message)
-        # print('action_list: ', action_list)
-
-        if self.play_order == 0:        # 顺序：我 --> 右边玩家 --> 左边玩家
-            self.my_played_event.set()
-        elif self.play_order == 1:      # 顺序：右边玩家 --> 左边玩家 --> 我
-            self.right_played_event.set()
-        elif self.play_order == 2:      # 顺序：左边玩家 --> 我 --> 右边玩家
-            self.left_played_event.set()
-
+        firstOfRound = True
         while self.worker_runing and self.card_playing:
-            # print('正在检测对局是否结束...')
+            if self.waiting_for_animation_to_end:
+                continue
+
+            if self.play_order_of_next == 0:
+                haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.MY_PLAYED_ANIMATION.value)
+                if haveAnimation:
+                    self.waiting_for_animation_to_end = True
+                    print('等待我的动画结束...')
+                    print()
+                    time.sleep(0.6)
+
+                self.waiting_for_animation_to_end = False
+                await self.getMyPlayedCards(firstOfRound)
+            elif self.play_order_of_next == 1:
+                haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.RIGHT_PLAYED_ANIMATION.value)
+                if haveAnimation:
+                    self.waiting_for_animation_to_end = True
+                    print('等待右侧动画结束...')
+                    print()
+                    time.sleep(0.6)
+
+                self.waiting_for_animation_to_end = False
+                await self.getRightPlayedCards(firstOfRound)
+            elif self.play_order_of_next == 2:
+                haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.LEFT_PLAYED_ANIMATION.value)
+                if haveAnimation:
+                    self.waiting_for_animation_to_end = True
+                    print('等待左侧动画结束...')
+                    print()
+                    time.sleep(0.6)
+                
+                self.waiting_for_animation_to_end = False
+                await self.getLeftPlayedCards(firstOfRound)
+                
+            firstOfRound = False
             game_overed = await self.gameHelper.check_if_game_overed()
             if game_overed:
                 self.round_count += 1
@@ -232,13 +244,6 @@ class WorkerThread(QThread):
                 self.reset_ai_env()
                 print('本轮对局已结束')
                 print()
-
-            time.sleep(1)
-        
-        # 等待所有线程完成
-        my_thread.join()
-        right_thread.join()
-        left_thread.join()
 
     def reset_status(self):
         self.in_game_start_screen = False
@@ -251,16 +256,13 @@ class WorkerThread(QThread):
         self.data_initializing = False
         self.data_initialized = False
         self.play_order = None
+        self.play_order_of_next = None
         self.card_playing = False
         self.my_hand_cards = ''
         self.my_hand_cards_env = None
         self.other_player_cards = None
         self.other_player_cards_str = None
         self.all_player_card_data = None
-
-        self.my_played_event.set()
-        self.right_played_event.set()
-        self.left_played_event.set()
 
     def stop_task(self):
         self.worker_runing = False
@@ -341,140 +343,88 @@ class WorkerThread(QThread):
                 self.other_player_cards[0:17] if (self.my_position_code + 1) % 3 == 1 else self.other_player_cards[17:]
         })
 
-    async def getRightPlayedCards(self):
-        while self.worker_runing and self.card_playing:
-            self.right_played_event.wait()
-            if not self.card_playing:
-                break
-
-            if self.right_played_completed:
-                continue
-
-            if self.waiting_for_animation_to_end:
-                continue
-
-            haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.RIGHT_PLAYED_ANIMATION.value)
-            if haveAnimation:
-                self.waiting_for_animation_to_end = True
-                print('等待右侧动画结束...')
-                print()
-                time.sleep(0.6)
-
-            self.waiting_for_animation_to_end = False
-            
-            rightBuchu = await self.gameHelper.get_right_played_text(template='buchu')
-            rightPlayedCards = await self.gameHelper.get_right_played_cards()
-
-            if rightBuchu is not None:
-                print("右侧玩家 >>> 不出牌")
-                print()
-                time.sleep(0.3)
-            
-            rightPlayed = rightPlayedCards is not None and len(rightPlayedCards) > 0
-            if rightPlayed:
-                print(f"右侧玩家 >>> 已出牌：{rightPlayedCards}")
-                print()
-                time.sleep(0.3)
+    async def getRightPlayedCards(self, firstOfRound):
+        if self.right_played_completed:
+            return
         
-            if rightBuchu is not None or rightPlayed:
-                self.right_played_completed = True
-                self.left_played_completed = False
-                self.right_played_event.clear()
-                self.left_played_event.set()
+        rightBuchu = None
+        if not firstOfRound:
+            rightBuchu = await self.gameHelper.get_right_played_text(template='buchu')
+        rightPlayedCards = await self.gameHelper.get_right_played_cards()
 
-    async def getLeftPlayedCards(self):
-        while self.worker_runing and self.card_playing:
-            self.left_played_event.wait()
-            if not self.card_playing:
-                break
-
-            if self.left_played_completed:
-                continue
-
-            if self.waiting_for_animation_to_end:
-                continue
-
-            haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.LEFT_PLAYED_ANIMATION.value)
-            if haveAnimation:
-                self.waiting_for_animation_to_end = True
-                print('等待左侧动画结束...')
-                print()
-                time.sleep(0.6)
-            
-            self.waiting_for_animation_to_end = False
-            
-            leftBuchu = await self.gameHelper.get_left_played_text(template='buchu')
-            leftPlayedCards = await self.gameHelper.get_left_played_cards()
-
-            if leftBuchu is not None:
-                print("左侧玩家 >>> 不出牌")
-                print()
-                time.sleep(0.3)
-            
-            leftPlayed = leftPlayedCards is not None and len(leftPlayedCards) > 0
-            if leftPlayed:
-                print(f"左侧玩家 >>> 已出牌：{leftPlayedCards}")
-                print()
-                time.sleep(0.3)
-            
-            if leftBuchu is not None or leftPlayed:
-                self.left_played_completed = True
-                self.my_played_completed = False
-                self.left_played_event.clear()
-                self.my_played_event.set()
+        if rightBuchu is not None:
+            print("右侧玩家 >>> 不出牌")
+            print()
+            time.sleep(0.3)
+        
+        rightPlayed = rightPlayedCards is not None and len(rightPlayedCards) > 0
+        if rightPlayed:
+            print(f"右侧玩家 >>> 已出牌：{rightPlayedCards}")
+            print()
+            time.sleep(0.3)
     
-    async def getMyPlayedCards(self):
-        while self.worker_runing and self.card_playing:
-            self.my_played_event.wait()
-            if not self.card_playing:
-                break
+        if rightBuchu is not None or rightPlayed:
+            self.right_played_completed = True
+            self.left_played_completed = False
+            self.play_order_of_next = 2
 
-            if self.my_played_completed:
-                continue
+    async def getLeftPlayedCards(self, firstOfRound):
+        if self.left_played_completed:
+            return
 
-            if self.waiting_for_animation_to_end:
-                continue
+        leftBuchu = None
+        if not firstOfRound:
+            leftBuchu = await self.gameHelper.get_left_played_text(template='buchu')
+        leftPlayedCards = await self.gameHelper.get_left_played_cards()
 
-            # action_message, action_list = self.env.step(self.my_position, update=False)
-            # print(f'action_message: {action_message}')
-            # print(f'action_list: {action_list}')
-
-            haveAnimation = await self.gameHelper.haveAnimation(AnimationArea.MY_PLAYED_ANIMATION.value)
-            if haveAnimation:
-                self.waiting_for_animation_to_end = True
-                print('等待我的动画结束...')
-                print()
-                time.sleep(0.6)
-
-            self.waiting_for_animation_to_end = False
-            
+        if leftBuchu is not None:
+            print("左侧玩家 >>> 不出牌")
+            print()
+            time.sleep(0.3)
+        
+        leftPlayed = leftPlayedCards is not None and len(leftPlayedCards) > 0
+        if leftPlayed:
+            print(f"左侧玩家 >>> 已出牌：{leftPlayedCards}")
+            print()
+            time.sleep(0.3)
+        
+        if leftBuchu is not None or leftPlayed:
+            self.left_played_completed = True
+            self.my_played_completed = False
+            self.play_order_of_next = 0
+    
+    async def getMyPlayedCards(self, firstOfRound):
+        if self.my_played_completed:
+            return
+        
+        myBuchu = None
+        if not firstOfRound:
             myBuchu = await self.gameHelper.get_my_played_text(template='buchu')
-            myPlayedCards = await self.gameHelper.get_my_played_cards()
+        myPlayedCards = await self.gameHelper.get_my_played_cards()
 
-            if myBuchu is not None:
-                print("我 >>> 不出牌")
-                print()
-                time.sleep(0.3)
-            
-            myPlayed = myPlayedCards is not None and len(myPlayedCards) > 0
-            if myPlayed:
-                print(f"我 >>> 已出牌：{myPlayedCards}")
-                print()
-                time.sleep(0.3)
+        if myBuchu is not None:
+            print("我 >>> 不出牌")
+            print()
+            time.sleep(0.3)
+        
+        myPlayed = myPlayedCards is not None and len(myPlayedCards) > 0
+        if myPlayed:
+            print(f"我 >>> 已出牌：{myPlayedCards}")
+            print()
+            time.sleep(0.3)
 
-            if (myBuchu is not None) or myPlayed:
-                self.my_played_completed = True
-                self.right_played_completed = False
-                self.my_played_event.clear()
-                self.right_played_event.set()
+        if (myBuchu is not None) or myPlayed:
+            self.my_played_completed = True
+            self.right_played_completed = False
+            self.play_order_of_next = 1
 
     async def autoBidding(self):
         if not self.play_cards_automatically:
             return
         
-        self.auto_bidding = True
+        self.auto_bidding_in_progress = True
         win_rate = await self.get_bid_win_rate()
-        while self.worker_runing and self.auto_bidding:
+        while self.worker_runing and self.auto_bidding_in_progress:
             if win_rate > self.config.bid_threshold:
                 call_success = await self.gameHelper.clickBtn('call_landlord_btn')
                 if call_success:
@@ -492,7 +442,7 @@ class WorkerThread(QThread):
 
             three_cards = await self.gameHelper.get_three_cards()
             if len(three_cards) == 3:
-                self.auto_bidding = False
+                self.auto_bidding_in_progress = False
             
             time.sleep(0.2)
 
@@ -501,9 +451,9 @@ class WorkerThread(QThread):
             self.landlord_confirmed = True
             return
         
-        self.auto_redouble = True
+        self.auto_redouble_in_progress = True
         win_rate = await self.get_game_win_rate()
-        while self.worker_runing and self.auto_redouble:
+        while self.worker_runing and self.auto_redouble_in_progress:
             success = False
             if win_rate > self.config.super_redouble_threshold:
                 success = await self.gameHelper.clickBtn('super_redouble_btn')
@@ -515,7 +465,7 @@ class WorkerThread(QThread):
                 success = await self.gameHelper.clickBtn('not_redouble_btn')
             
             if success:
-                self.auto_redouble = False
+                self.auto_redouble_in_progress = False
                 self.landlord_confirmed = True
 
             time.sleep(0.2)
