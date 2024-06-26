@@ -1,14 +1,10 @@
 import os
-import time
 
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
-from torch.utils.data.dataset import Dataset
 
-from douzero.dmc.models_new import model_dict_resnet
 from douzero.env.game_new import GameEnv
-from douzero.evaluation.deep_agent import DeepAgent
+from douzero.evaluation.deep_agent_new import DeepAgent
 
 
 def EnvToOnehot(cards):

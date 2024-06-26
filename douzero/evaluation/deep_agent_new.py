@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from douzero.env.env import get_obs
+from douzero.env.env_new import get_obs
 
 def _load_model(position, model_path, model_type):
     from douzero.dmc.models_new import model_dict, model_dict_resnet, model_dict_general

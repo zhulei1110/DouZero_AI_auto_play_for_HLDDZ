@@ -84,7 +84,9 @@ class WorkerThread(QThread):
 
         self.auto_bidding_in_progress = False
         self.auto_redouble_in_progress = False
+
         self.round_count = 0
+        self.try_num = 3
 
         self.model_path_dict = {
             'landlord': "baselines/resnet/resnet_landlord.ckpt",
@@ -169,6 +171,11 @@ class WorkerThread(QThread):
             self.game_started = True
 
             await self.autoBidding()
+
+            # 需要记录3人的叫地主情况
+            # 如果3人都不叫地主，将会重新发牌，重新开局
+            # 3人连续都不叫地主的局数最多3局，前2局会重新发牌，第3局就首家默认是地主
+
             await self.getThreeCards()
             await self.getMyPosition()
             await self.getMyHandCards()
@@ -211,7 +218,7 @@ class WorkerThread(QThread):
                     self.waiting_for_animation_to_end = True
                     print('等待我的动画结束...')
                     print()
-                    time.sleep(0.6)
+                    time.sleep(0.3)
 
                 self.waiting_for_animation_to_end = False
                 await self.getMyPlayedCards(firstOfRound)
@@ -221,7 +228,7 @@ class WorkerThread(QThread):
                     self.waiting_for_animation_to_end = True
                     print('等待右侧动画结束...')
                     print()
-                    time.sleep(0.6)
+                    time.sleep(0.3)
 
                 self.waiting_for_animation_to_end = False
                 await self.getRightPlayedCards(firstOfRound)
@@ -231,7 +238,7 @@ class WorkerThread(QThread):
                     self.waiting_for_animation_to_end = True
                     print('等待左侧动画结束...')
                     print()
-                    time.sleep(0.6)
+                    time.sleep(0.3)
                 
                 self.waiting_for_animation_to_end = False
                 await self.getLeftPlayedCards(firstOfRound)
@@ -263,6 +270,12 @@ class WorkerThread(QThread):
         self.other_player_cards = None
         self.other_player_cards_str = None
         self.all_player_card_data = None
+        self.right_played_completed = False
+        self.left_played_completed = False
+        self.my_played_completed = False
+        self.waiting_for_animation_to_end = False
+        self.auto_bidding_in_progress = False
+        self.auto_redouble_in_progress = False
 
     def stop_task(self):
         self.worker_runing = False
@@ -350,19 +363,39 @@ class WorkerThread(QThread):
         rightBuchu = None
         if not firstOfRound:
             rightBuchu = await self.gameHelper.get_right_played_text(template='buchu')
-        rightPlayedCards = await self.gameHelper.get_right_played_cards()
-
-        if rightBuchu is not None:
-            print("右侧玩家 >>> 不出牌")
-            print()
-            time.sleep(0.3)
+            if rightBuchu is not None:
+                print("右侧玩家 >>> 不出牌")
+                print()
+        
+        tempArr = []
+        if rightBuchu is None:
+            for i in range(self.try_num):
+                result = await self.gameHelper.get_right_played_cards()
+                print(f"第{i + 1}次尝试获取 >>> 右侧玩家的出牌：{result}")
+                print()
+                if result is not None and len(result) > 0:
+                    tempArr.append(result)
+                else:
+                    tempArr.append("")
+                time.sleep(0.2)
+        
+        rightPlayedCards = None
+        if len(tempArr) == 3:
+            # 特殊情况：只有第一次获取到了，后面牌就消失了，再也获取不到了
+            if len(tempArr[0]) > 0 and tempArr[1] == "" and tempArr[2] == "":   
+                rightPlayedCards = tempArr[0]
+            else:
+                # 过滤掉空字符串，至少还要有两次获取到的值
+                dataList = list(filter(bool, tempArr))
+                if len(dataList) > 1:
+                    rightPlayedCards = max(dataList, key=len)
         
         rightPlayed = rightPlayedCards is not None and len(rightPlayedCards) > 0
         if rightPlayed:
             print(f"右侧玩家 >>> 已出牌：{rightPlayedCards}")
             print()
-            time.sleep(0.3)
-    
+        
+        time.sleep(0.2)
         if rightBuchu is not None or rightPlayed:
             self.right_played_completed = True
             self.left_played_completed = False
@@ -375,19 +408,39 @@ class WorkerThread(QThread):
         leftBuchu = None
         if not firstOfRound:
             leftBuchu = await self.gameHelper.get_left_played_text(template='buchu')
-        leftPlayedCards = await self.gameHelper.get_left_played_cards()
+            if leftBuchu is not None:
+                print("左侧玩家 >>> 不出牌")
+                print()
 
-        if leftBuchu is not None:
-            print("左侧玩家 >>> 不出牌")
-            print()
-            time.sleep(0.3)
+        tempArr = []
+        if leftBuchu is None:
+            for i in range(self.try_num):
+                result = await self.gameHelper.get_left_played_cards()
+                print(f"第{i + 1}次尝试获取 >>> 左侧玩家的出牌：{result}")
+                print()
+                if result is not None and len(result) > 0:
+                    tempArr.append(result)
+                else:
+                    tempArr.append("")
+                time.sleep(0.2)
         
+        leftPlayedCards = None
+        if len(tempArr) == 3:
+            # 特殊情况：只有第一次获取到了，后面牌就消失了，再也获取不到了
+            if len(tempArr[0]) > 0 and tempArr[1] == "" and tempArr[2] == "":
+                leftPlayedCards = tempArr[0]
+            else:
+                # 过滤掉空字符串，至少还要有两次获取到的值
+                dataList = list(filter(bool, tempArr))
+                if len(dataList) > 1:
+                    leftPlayedCards = max(dataList, key=len)
+
         leftPlayed = leftPlayedCards is not None and len(leftPlayedCards) > 0
         if leftPlayed:
             print(f"左侧玩家 >>> 已出牌：{leftPlayedCards}")
             print()
-            time.sleep(0.3)
         
+        time.sleep(0.2)
         if leftBuchu is not None or leftPlayed:
             self.left_played_completed = True
             self.my_played_completed = False
@@ -400,19 +453,39 @@ class WorkerThread(QThread):
         myBuchu = None
         if not firstOfRound:
             myBuchu = await self.gameHelper.get_my_played_text(template='buchu')
-        myPlayedCards = await self.gameHelper.get_my_played_cards()
+            if myBuchu is not None:
+                print("我 >>> 不出牌")
+                print()
 
-        if myBuchu is not None:
-            print("我 >>> 不出牌")
-            print()
-            time.sleep(0.3)
+        tempArr = []
+        if myBuchu is None:
+            for i in range(self.try_num):
+                result = await self.gameHelper.get_my_played_cards()
+                print(f"第{i + 1}次尝试获取 >>> 我的出牌：{result}")
+                print()
+                if result is not None and len(result) > 0:
+                    tempArr.append(result)
+                else:
+                    tempArr.append("")
+                time.sleep(0.2)
+        
+        myPlayedCards = None
+        if len(tempArr) == 3:
+            # 特殊情况：只有第一次获取到了，后面牌就消失了，再也获取不到了
+            if len(tempArr[0]) > 0 and tempArr[1] == "" and tempArr[2] == "":
+                myPlayedCards = tempArr[0]
+            else:
+                # 过滤掉空字符串，至少还要有两次获取到的值
+                dataList = list(filter(bool, tempArr))
+                if len(dataList) > 1:
+                    myPlayedCards = max(dataList, key=len)
         
         myPlayed = myPlayedCards is not None and len(myPlayedCards) > 0
         if myPlayed:
             print(f"我 >>> 已出牌：{myPlayedCards}")
             print()
-            time.sleep(0.3)
-
+        
+        time.sleep(0.2)
         if (myBuchu is not None) or myPlayed:
             self.my_played_completed = True
             self.right_played_completed = False

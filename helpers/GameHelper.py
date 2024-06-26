@@ -138,16 +138,16 @@ class GameHelper:
         gray1 = cv2.cvtColor(np.asarray(img1), cv2.COLOR_BGR2GRAY)
         gray2 = cv2.cvtColor(np.asarray(img2), cv2.COLOR_BGR2GRAY)
 
+        # 使用结构相似性指数（SSIM）比较相似度
+        ssim_index, _ = ssim(gray1, gray2, full=True)
+        if ssim_index < 0.99:
+            return True
+
         # 图片日志
         if self.screenHelper.config.animation_image_compare_logs:
             unique_key = self.screenHelper.compute_image_unique_key(gray1)
             cv2.imwrite(f'screenshots/logs/i_c_{unique_key}_current.png', gray1)
             cv2.imwrite(f'screenshots/logs/i_c_{unique_key}_previous.png', gray2)
-
-        # 使用结构相似性指数（SSIM）比较相似度
-        ssim_index, _ = ssim(gray1, gray2, full=True)
-        if ssim_index < 0.99:
-            return True
 
         return False
     
@@ -175,15 +175,15 @@ class GameHelper:
 
         if areaName == AnimationArea.RIGHT_PLAYED_ANIMATION.value:
             animationPos1 = self.screenHelper.getCapturePosition2(ScreenshotArea.RIGHT_PLAYED_CARDS.value)
-            # animationPos2 = self.screenHelper.getCapturePosition2(ScreenshotArea.RIGHT_PLAYED_ANIMATION_1.value)
-            animationPos3 = self.screenHelper.getCapturePosition2(ScreenshotArea.RIGHT_PLAYED_ANIMATION_2.value)
-            haveAnimation = await self.__haveAnimation(intervals, regions=[animationPos1, animationPos3])
+            animationPos2 = self.screenHelper.getCapturePosition2(ScreenshotArea.RIGHT_PLAYED_ANIMATION_1.value)
+            # animationPos3 = self.screenHelper.getCapturePosition2(ScreenshotArea.RIGHT_PLAYED_ANIMATION_2.value)
+            haveAnimation = await self.__haveAnimation(intervals, regions=[animationPos2])
 
         if areaName == AnimationArea.LEFT_PLAYED_ANIMATION.value:
             animationPos1 = self.screenHelper.getCapturePosition2(ScreenshotArea.LEFT_PLAYED_CARDS.value)
-            # animationPos2 = self.screenHelper.getCapturePosition2(ScreenshotArea.LEFT_PLAYED_ANIMATION_1.value)
-            animationPos3 = self.screenHelper.getCapturePosition2(ScreenshotArea.LEFT_PLAYED_ANIMATION_2.value)
-            haveAnimation = await self.__haveAnimation(intervals, regions=[animationPos1, animationPos3])
+            animationPos2 = self.screenHelper.getCapturePosition2(ScreenshotArea.LEFT_PLAYED_ANIMATION_1.value)
+            # animationPos3 = self.screenHelper.getCapturePosition2(ScreenshotArea.LEFT_PLAYED_ANIMATION_2.value)
+            haveAnimation = await self.__haveAnimation(intervals, regions=[animationPos2])
 
         if areaName == AnimationArea.MY_PLAYED_ANIMATION.value:
             animationPos1 = self.screenHelper.getCapturePosition2(ScreenshotArea.MY_PLAYED_CARDS.value)

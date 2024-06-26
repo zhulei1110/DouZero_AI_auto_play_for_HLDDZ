@@ -1,4 +1,4 @@
-from douzero.env.move_generator import MovesGener
+from douzero.env.move_generator_new import MovesGener
 from douzero.env.move_detector import get_move_type
 from douzero.env import move_selector
 
