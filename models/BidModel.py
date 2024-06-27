@@ -4,22 +4,20 @@ import torch
 import torch.nn.functional as F
 
 from torch import nn
+from constants import EnvCard2IdxMap, RealCard2IdxMap
 
 
 # 将环境中的卡牌列表转换为 Onehot 编码
 def EnvToOnehot(cards):
-    Env2IdxMap = {3: 0, 4: 1, 5: 2, 6: 3, 7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9, 13: 10, 14: 11, 17: 12, 20: 13, 30: 14}
-    cards = [Env2IdxMap[i] for i in cards]
+    cards = [EnvCard2IdxMap[i] for i in cards]
     Onehot = torch.zeros((4, 15))
     for i in range(0, 15):
         Onehot[:cards.count(i), i] = 1
     return Onehot
 
-
 # 将真实的卡牌字符转换为 Onehot 编码
 def RealToOnehot(cards):
-    RealCard2EnvCard = {'3': 0, '4': 1, '5': 2, '6': 3, '7': 4, '8': 5, '9': 6, 'T': 7, 'J': 8, 'Q': 9, 'K': 10, 'A': 11, '2': 12, 'X': 13, 'D': 14}
-    cards = [RealCard2EnvCard[c] for c in cards]
+    cards = [RealCard2IdxMap[c] for c in cards]
     Onehot = torch.zeros((4, 15))
     for i in range(0, 15):
         Onehot[:cards.count(i), i] = 1
@@ -75,7 +73,7 @@ class Net(nn.Module):
         return x
 
 
-# 初始化模型并检查是否使用 GPU，如果有权重文件，则加载这些权重
+# 初始化模型并检查是否使用 GPU
 UseGPU = False
 device = torch.device('cuda:0' if UseGPU and torch.cuda.is_available() else 'cpu')
 
@@ -89,6 +87,7 @@ if UseGPU:
     net = net.to(device)
     net2 = net2.to(device)
 
+# 如果有权重文件，则加载这些权重文件
 if os.path.exists("./weights/bid_weights.pkl"):
     if torch.cuda.is_available():
         net2.load_state_dict(torch.load('./weights/bid_weights.pkl'))
@@ -105,8 +104,7 @@ def predict(cards):
     win_rate = net(input)
     return win_rate[0].item() * 100
 
-
-# predict_score 函数将卡牌转换为 Onehot 编码，并使用 Net2 模型预测得分
+# predict_score 函数将卡牌转换为 Onehot 编码，并使用 Net2 模型预测胜率
 def predict_score(cards):
     if len(cards) == 0 or cards is None:
         return 0

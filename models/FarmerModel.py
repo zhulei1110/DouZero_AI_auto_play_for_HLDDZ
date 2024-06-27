@@ -4,27 +4,25 @@ import torch
 import torch.nn.functional as F
 
 from torch import nn
+from constants import EnvCard2IdxMap, RealCard2IdxMap
 
 
 # 这个函数将一组卡牌转换为 one-hot 编码
-# Env2IdxMap 映射卡牌的值到索引
+# EnvCard2IdxMap 映射卡牌的值到索引
 # cards 中的每个值都被映射到对应的索引
 # 然后根据索引生成一个 4x15 的 one-hot 矩阵
 def EnvToOnehot(cards):
-    Env2IdxMap = {3: 0, 4: 1, 5: 2, 6: 3, 7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9, 13: 10, 14: 11, 17: 12, 20: 13, 30: 14}
-    cards = [Env2IdxMap[i] for i in cards]
+    cards = [EnvCard2IdxMap[i] for i in cards]
     Onehot = torch.zeros((4, 15))
     for i in range(0, 15):
         Onehot[:cards.count(i), i] = 1
     return Onehot
 
-
 # 这个函数类似于 EnvToOnehot
 # 但它处理的是字符表示的卡牌（例如'3', '4', 'T', 'J'等）
 # 同样生成一个 4x15 的 one-hot 矩阵
 def RealToOnehot(cards):
-    RealCard2EnvCard = {'3': 0, '4': 1, '5': 2, '6': 3, '7': 4, '8': 5, '9': 6, 'T': 7, 'J': 8, 'Q': 9, 'K': 10, 'A': 11, '2': 12, 'X': 13, 'D': 14}
-    cards = [RealCard2EnvCard[c] for c in cards]
+    cards = [RealCard2IdxMap[c] for c in cards]
     Onehot = torch.zeros((4, 15))
     for i in range(0, 15):
         Onehot[:cards.count(i), i] = 1
@@ -80,7 +78,6 @@ if os.path.exists("./weights/farmer_weights.pkl"):
     else:
         Nets["farmer"].load_state_dict(torch.load("./weights/farmer_weights.pkl", map_location=torch.device("cpu")))
     Nets["farmer"].eval()
-
 
 def predict(cards, type="up"):
     if len(cards) == 0 or cards is None:

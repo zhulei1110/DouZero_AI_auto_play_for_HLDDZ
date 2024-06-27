@@ -3,81 +3,11 @@ from copy import deepcopy
 from . import move_detector as md, move_selector as ms
 from .move_generator import MovesGener
 
+from constants import EnvCard2RealCard, AllEnvCard, Bombs
 from utils import search_actions, select_optimal_path, check_42
 
-EnvCard2RealCard = {
-    3: '3',
-    4: '4',
-    5: '5',
-    6: '6',
-    7: '7',
-    8: '8',
-    9: '9',
-    10: 'T',
-    11: 'J',
-    12: 'Q',
-    13: 'K',
-    14: 'A',
-    17: '2',
-    20: 'X',
-    30: 'D'
-}
-
-RealCard2EnvCard = {
-    '3': 3,
-    '4': 4,
-    '5': 5,
-    '6': 6,
-    '7': 7,
-    '8': 8,
-    '9': 9,
-    'T': 10,
-    'J': 11,
-    'Q': 12,
-    'K': 13,
-    'A': 14,
-    '2': 17,
-    'X': 20,
-    'D': 30
-}
-
-AllEnvCard = [
-    3, 3, 3, 3,
-    4, 4, 4, 4,
-    5, 5, 5, 5,
-    6, 6, 6, 6,
-    7, 7, 7, 7,
-    8, 8, 8, 8,
-    9, 9, 9, 9,
-    10, 10, 10, 10,
-    11, 11, 11, 11,
-    12, 12, 12, 12,
-    13, 13, 13, 13,
-    14, 14, 14, 14,
-    17, 17, 17, 17,
-    20, 30
-]
-
-bombs = [
-    [3, 3, 3, 3],
-    [4, 4, 4, 4],
-    [5, 5, 5, 5],
-    [6, 6, 6, 6],
-    [7, 7, 7, 7],
-    [8, 8, 8, 8],
-    [9, 9, 9, 9],
-    [10, 10, 10, 10],
-    [11, 11, 11, 11],
-    [12, 12, 12, 12],
-    [13, 13, 13, 13],
-    [14, 14, 14, 14],
-    [17, 17, 17, 17],
-    [30, 20]
-]
-
-
 class GameEnv(object):
-    def __init__(self, players, players2=None):
+    def __init__(self, players):
         self.game_infoset = None            # 当前游戏信息集
         self.card_play_action_seq = []      # 出牌动作序列
 
@@ -88,7 +18,6 @@ class GameEnv(object):
         self.player_utility_dict = None     # 玩家得分的字典
 
         self.players = players              # 玩家列表
-        self.players2 = players2            # 备用玩家列表
 
         self.model_type = ""                # 模型类型
 
@@ -152,13 +81,13 @@ class GameEnv(object):
         self.get_acting_player_position()
         self.game_infoset = self.get_infoset()
 
-    def game_done(self):
+    def check_if_game_overed(self):
         # 如果地主、上家或下家中有任何一家的手牌数量为零，即表示有玩家已经出完了手中的牌
         if len(self.info_sets['landlord'].player_hand_cards) == 0 or \
             len(self.info_sets['landlord_up'].player_hand_cards) == 0 or \
                 len(self.info_sets['landlord_down'].player_hand_cards) == 0:
 
-            self.compute_player_utility()   # # 计算玩家的效用（得分或者胜利情况）
+            self.compute_player_utility()   # 计算玩家的效用（得分或者胜利情况）
             self.update_num_wins_scores()   # 更新胜局数和分数等游戏数据
 
             self.game_over = True
@@ -218,7 +147,10 @@ class GameEnv(object):
         return False
 
     def step(self, position, action=None, update=True):
-        if action is None:
+        if action is not None and len(action) > 0:
+            action_list = [[action, 0]]
+            win_rate = 0
+        else:
             action = []
             win_rate = 0
             action_list = []
@@ -226,103 +158,120 @@ class GameEnv(object):
             # 如果当前轮到的玩家是指定的 position
             if self.acting_player_position == position:
                 # 根据游戏信息集合调用玩家的动作方法，获取动作和动作的置信度
-                if self.players2 is None:
-                    action, actions_confidence, action_list = self.players[1].act(self.game_infoset)
-                else:
-                    action, actions_confidence, action_list = self.players2[1].act(self.game_infoset)
-                
+                action, actions_confidence, action_list = self.players[1].act(self.game_infoset)
                 win_rate = actions_confidence
 
                 # 特殊情况处理：直接出完牌
                 if len(action) != len(self.game_infoset.player_hand_cards):
-                    for l_action, l_score in action_list:
-                        if len(l_action) == len(self.game_infoset.player_hand_cards):
-                            m_type = md.get_move_type(l_action)
-                            if m_type["type"] not in [md.TYPE_14_4_22, md.TYPE_13_4_2]:
-                                action = l_action
-                                win_rate = 10000
-                                print("检测到可直接出完出法")
+                    if len(action_list) > 0:
+                        for l_action, l_score in action_list:
+                            if len(l_action) == len(self.game_infoset.player_hand_cards):
+                                m_type = md.get_move_type(l_action)
+                                if m_type["type"] not in [md.TYPE_14_4_22, md.TYPE_13_4_2]:
+                                    action = l_action
+                                    win_rate = 10000
+                                    print("env log: 检测到可直接出完")
+                                    print()
 
                 # 获取最后两次出牌动作
                 last_two_moves = self.get_last_two_moves()
                 rival_move = None
                 if last_two_moves[0]:
-                    rival_move = last_two_moves[0]
+                    rival_move = last_two_moves[0]      # 优先选择第一个动作作为对手的动作
                 elif last_two_moves[1]:
-                    rival_move = last_two_moves[1]
+                    rival_move = last_two_moves[1]      # 如果第一个动作不存在，则选择第二个动作作为对手的动作
 
-                # 如果没有直接出完牌，进行路径搜索
+                # 如果不能直接出完牌，则进行路径搜索
                 if win_rate != 10000:
-                    path_list = []
-                    search_actions(self.game_infoset.player_hand_cards, self.game_infoset.other_hand_cards, path_list, rival_move=rival_move)
+                    path_list = []      # 所有可能的出牌路径
+                    search_actions(self.game_infoset.player_hand_cards,
+                                   self.game_infoset.other_hand_cards,
+                                   path_list,
+                                   rival_move=rival_move)
+                    
                     if len(path_list) > 0:
-                        path = select_optimal_path(path_list)
-                        if not check_42(path):
+                        path = select_optimal_path(path_list)       # 选择最优路径
+                        if not check_42(path):                      # 检查是否是4带2
                             if action != path[0]:
-                                print("检测到可直接出完路径：", self.action_to_str(action), "->",
-                                    self.path_to_str(path))
+                                print(f"env log: 检测到可直接出完路径：{self.action_to_str(action)} -> {self.path_to_str(path)}")
+                                print()
                                 action = path[0]
                                 win_rate = 20000
-        else:
-            action_list = [[action, 0]]
-            win_rate = 0
 
         if update:
+            # 设置最后行动玩家为当前行动玩家
             if len(action) > 0:
-                self.last_pid = self.acting_player_position                     # 设置最后行动玩家为当前行动玩家
+                self.last_pid = self.acting_player_position
 
-            if action in bombs:
-                self.bomb_num += 1                                              # 如果动作是炸弹，则增加炸弹数量
+            # 如果动作是炸弹，则增加炸弹数量
+            if action in Bombs:
+                self.bomb_num += 1
 
             self.last_move_dict[self.acting_player_position] = action.copy()    # 更新最后一次动作字典
-
             self.card_play_action_seq.append((position, action))                # 添加动作到出牌序列
-
+            
             self.update_acting_player_hand_cards(action)                        # 更新当前行动玩家的手牌
-
+            
             self.played_cards[self.acting_player_position] += action            # 更新已经出过的牌
 
             # 如果当前行动玩家是地主，并且出牌不为空，并且还有地主三张底牌未被出过
             if self.acting_player_position == 'landlord' and len(action) > 0 and len(self.three_landlord_cards) > 0:
+                # 更新 three_landlord_cards
                 for card in action:
                     if len(self.three_landlord_cards) > 0:
                         if card in self.three_landlord_cards:
                             self.three_landlord_cards.remove(card)
                     else:
                         break
-
-            self.game_done()  # 检查游戏是否结束
+            
+            # 检查游戏是否结束
+            self.check_if_game_overed()
 
             # 如果游戏还没结束，更新当前行动玩家和游戏信息集合
             if not self.game_over:
+                # print(f"env log: 上一次行动玩家是 {self.acting_player_position}")
+                # print()
                 self.get_acting_player_position()
+                # print(f"env log: 当前行动玩家是 {self.acting_player_position}（更新后）")
+                # print()
                 self.game_infoset = self.get_infoset()
 
-        # 按照动作的置信度排序动作列表
+        # 按照置信度排序
         action_list.sort(key=self.compare_action, reverse=True)
 
         # 根据特定规则进一步调整动作选择
         if len(action_list) >= 2:
+            # 检查 第一个动作（优先级最高的动作）的胜率 是否小于 0
+            # 如果胜率小于 0，则执行下面的逻辑
             if float(action_list[0][1]) < 0:
                 action_list.sort(key=self.compare_action, reverse=True)
+
+                # 选择第二优先级的动作
                 action, actions_confidence = action_list[1][0], action_list[1][1]
                 win_rate = actions_confidence
-                print("炸弹胜率低于0，不允许炸")
 
+            # 如果 action 为空
             if not action:
+                # 检查 第二优先级动作 的胜率（乘以 8）是否大于 1
                 if float(action_list[1][1]) * 8 > 1:
                     action_list.sort(key=self.compare_action, reverse=True)
+
+                    # 选择第二优先级的动作（第二选择的胜率大于1，直接出）
                     action, actions_confidence = action_list[1][0], action_list[1][1]
                     win_rate = actions_confidence
-                    print("第二选择胜率大于1，直接出")
                 
+                # 检查以下条件是否成立：
+                # - position 是否为 "landlord"
+                # - 第一优先级动作 和 第二优先级动作 的胜率差异（乘以 8）是否小于 0.2
+                # - 第二优先级动作 的胜率（乘以 8）是否大于 0
                 if (position == "landlord" and (float(action_list[0][1]) - float(action_list[1][1])) * 8 < 0.2 and float(action_list[1][1]) * 8 > 0):
                     action_list.sort(key=self.compare_action, reverse=True)
+                    
+                    # 选择第二优先级的动作（地主第二选择胜率大于0，且与第一选择相差小于0.2，直接出）
                     action, actions_confidence = action_list[1][0], action_list[1][1]
                     win_rate = actions_confidence
-                    print("地主第二选择胜率大于0，且与第一选择相差小于0.2，直接出")
 
-        # 构建返回的动作信息和动作列表信息
+        # 构建返回的信息
         action_message = {
             "action": str(''.join([EnvCard2RealCard[c] for c in action])),
             "win_rate": float(win_rate) * 8
@@ -382,11 +331,15 @@ class GameEnv(object):
         if action != []:
             # 更新玩家手牌，删除对应的牌
             if self.acting_player_position == self.players[0]:
+                # print("env log: 已更新当前玩家（我的）手牌")
+                # print()
                 for card in action:
                     self.info_sets[self.acting_player_position].player_hand_cards.remove(card)
-            # 更新另外两个玩家手牌，删除相同数量的牌
             else:
+                # print("env log: 已更新另外两个玩家手牌（删除相同数量的牌）")
+                # print()
                 del self.info_sets[self.acting_player_position].player_hand_cards[0:len(action)]
+
             self.info_sets[self.acting_player_position].player_hand_cards.sort()
 
     # 获取当前玩家可以合法出牌的所有可能动作

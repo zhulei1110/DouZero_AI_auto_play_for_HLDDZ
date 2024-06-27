@@ -4,7 +4,7 @@
     "window_class_name": "UnityWndClass",
     "screenshot_image_logs": false,
     "template_match_image_logs": false,
-    "animation_image_compare_logs": true,
+    "animation_image_compare_logs": false,
     "king_color_compare_image_logs": false,
     "screenshot_areas": {
         "quick_start_btn": "0.783333333,0.860185185,0.138020833,0.115740741",

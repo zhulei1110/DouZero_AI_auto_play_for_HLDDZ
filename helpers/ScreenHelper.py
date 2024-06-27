@@ -67,6 +67,18 @@ class ScreenHelper:
     def getZoomRate(self):
         self.ScreenZoomRate = windll.shcore.GetScaleFactorForDevice(0) / 100
     
+    def setWindowSize(self):
+        # 查找窗口句柄
+        hwnd = win32gui.FindWindow(self.config.window_class_name, None)
+        if hwnd:
+            # 获取当前窗口位置和大小
+            left, top, right, bottom = win32gui.GetWindowRect(hwnd)
+
+            # 设置窗口位置和大小
+            win32gui.MoveWindow(hwnd, left, top, self.WindowWidth, self.WindowHeight, True)
+        else:
+            print(f"请确认欢乐斗地主游戏窗口是否打开")
+
     def compute_image_unique_key(self, image):
         image_bytes = image.tobytes()
         hash_value = hash(image_bytes)

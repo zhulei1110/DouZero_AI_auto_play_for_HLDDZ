@@ -6,19 +6,18 @@ from torch import nn
 from douzero.env.game_new import GameEnv
 from douzero.evaluation.deep_agent_new import DeepAgent
 
+from constants import RealCard2EnvCard, AllEnvCard, EnvCard2IdxMap, RealCard2IdxMap
+
 
 def EnvToOnehot(cards):
-    Env2IdxMap = {3: 0, 4: 1, 5: 2, 6: 3, 7: 4, 8: 5, 9: 6, 10: 7, 11: 8, 12: 9, 13: 10, 14: 11, 17: 12, 20: 13, 30: 14}
-    cards = [Env2IdxMap[i] for i in cards]
+    cards = [EnvCard2IdxMap[i] for i in cards]
     Onehot = torch.zeros((4, 15))
     for i in range(0, 15):
         Onehot[:cards.count(i), i] = 1
     return Onehot
 
-
 def RealToOnehot(cards):
-    RealCard2EnvCard = {'3': 0, '4': 1, '5': 2, '6': 3, '7': 4, '8': 5, '9': 6, 'T': 7, 'J': 8, 'Q': 9, 'K': 10, 'A': 11, '2': 12, 'X': 13, 'D': 14}
-    cards = [RealCard2EnvCard[c] for c in cards]
+    cards = [RealCard2IdxMap[c] for c in cards]
     Onehot = torch.zeros((4, 15))
     for i in range(0, 15):
         Onehot[:cards.count(i), i] = 1
@@ -49,12 +48,12 @@ class Net(nn.Module):
         x = torch.relu(self.dropout5(self.fc5(x)))
         x = self.fc6(x)
         return x
-    
 
-# 这个部分加载已经训练好的模型权重文件（如果存在），并将模型设置为评估模式
-# 根据当前设备（CPU或GPU）加载模型权重
+
 net = Net()
-net.eval()
+net.eval()      # 将模型设置为评估模式
+
+# 根据当前设备（CPU或GPU）加载训练好的模型权重文件（如果存在）
 if os.path.exists("./weights/landlord_weights.pkl"):
     if torch.cuda.is_available():
         net.load_state_dict(torch.load('./weights/landlord_weights.pkl'))
@@ -76,7 +75,6 @@ def predict(cards):
 ai_players = []
 env = GameEnv(ai_players)
 
-
 # 这个函数初始化 AI 玩家和游戏环境
 # 使用指定路径的模型文件创建一个新的 DeepAgent 作为 “地主” 玩家
 def init_model(model_path):
@@ -84,30 +82,13 @@ def init_model(model_path):
     ai_players = ["landlord", DeepAgent("landlord", model_path)]
     env = GameEnv(ai_players)
 
-
-# 这个函数与 init_model 类似
-# 但它同时初始化两个不同模型路径的 AI 玩家
-# 分别使用 model_path 和 wp_model_path
-def init_model2(model_path, wp_model_path):
-    global ai_players, env
-    ai_players = ["landlord", DeepAgent("landlord", model_path)]
-    ai_players2 = ["landlord", DeepAgent("landlord", wp_model_path)]
-    env = GameEnv(ai_players, ai_players2)
-
-
 # 这个函数使用模型进行预测
 # 首先，定义所有可能的卡牌，然后将用户的手牌和 “地主” 三张底牌转换为环境中的卡牌表示
 # 通过计算其他两位玩家的手牌，初始化游戏环境，进行一步模拟，并返回当前手牌的胜率
 def predict_by_model(cards, llc):
     if len(cards) == 0 or cards is None:
         return 0
-    
-    AllEnvCard = [3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7,
-                  8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10, 11, 11, 11, 11, 12,
-                  12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 17, 17, 17, 17, 20, 30]
-    RealCard2EnvCard = {'3': 3, '4': 4, '5': 5, '6': 6, '7': 7,
-                        '8': 8, '9': 9, 'T': 10, 'J': 11, 'Q': 12,
-                        'K': 13, 'A': 14, '2': 17, 'X': 20, 'D': 30}
+
     env.reset()
 
     other_hand_cards = []

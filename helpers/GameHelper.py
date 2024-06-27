@@ -9,7 +9,7 @@ from helpers.ColorRecognizer import ColorRecognizer
 from helpers.ImageLocator import ImageLocator
 from helpers.ScreenHelper import ScreenHelper, ScreenshotArea
 
-AllCards = ['D', 'X', '2', 'A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3']
+from constants import RealCards
 
 # 牌检测结果滤波
 # 过滤掉相互距离太近的牌，只保留相距超过一定距离的牌
@@ -65,7 +65,7 @@ class GameHelper:
         if scale is None:
             scale = await self.imageLocator.get_resize_scale(image)
 
-        for card in AllCards:
+        for card in RealCards:
             templateName = f'{mark}_{card}'
             result = await self.imageLocator.locate_all_match_on_image(image=image, templateName=templateName, region=pos, scale=scale, confidence=confidence)
             

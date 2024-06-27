@@ -1,22 +1,24 @@
-from collections import Counter
 import numpy as np
 
-from douzero.env.game import GameEnv
+from collections import Counter
+from douzero.env.game_new import GameEnv
 
-Card2Column = {3: 0, 4: 1, 5: 2, 6: 3, 7: 4, 8: 5, 9: 6, 10: 7,
-               11: 8, 12: 9, 13: 10, 14: 11, 17: 12}
+Card2Column = { 3:0, 4:1, 5:2, 6:3, 7:4, 8:5, 9:6, 10:7, 11:8, 12:9, 13:10, 14:11, 17:12 }
 
-NumOnes2Array = {0: np.array([0, 0, 0, 0]),
-                 1: np.array([1, 0, 0, 0]),
-                 2: np.array([1,  1, 0, 0]),
-                 3: np.array([1, 1, 1, 0]),
-                 4: np.array([1, 1, 1, 1])}
+NumOnes2Array = {
+    0: np.array([0, 0, 0, 0]), 
+    1: np.array([1, 0, 0, 0]),
+    2: np.array([1, 1, 0, 0]),
+    3: np.array([1, 1, 1, 0]),
+    4: np.array([1, 1, 1, 1])
+}
 
 deck = []
 for i in range(3, 15):
     deck.extend([i for _ in range(4)])
 deck.extend([17 for _ in range(4)])
 deck.extend([20, 30])
+
 
 class Env:
     """
@@ -154,6 +156,7 @@ class Env:
         """
         return self._env.game_over
 
+
 class DummyAgent(object):
     """
     Dummy agent is designed to easily interact with the
@@ -231,7 +234,6 @@ def _cards2array(list_cards):
         elif card == 30:
             jokers[1] = 1
     return np.concatenate((matrix.flatten('F'), jokers))
-
 
 def _action_seq_list2array(action_seq_list, model_type="old"):
     if model_type == "general":
@@ -822,7 +824,6 @@ def _get_obs_general(infoset, position):
     }
     return obs
 
-
 def gen_bid_legal_actions(player_id, bid_info):
     self_bid_info = bid_info[:, [(player_id - 1) % 3, player_id, (player_id + 1) % 3]]
     curr_round = -1
@@ -837,7 +838,6 @@ def gen_bid_legal_actions(player_id, bid_info):
         self_bid_info[curr_round] = [0, 1, 0]
         bid_actions.append(np.array(self_bid_info).flatten())
     return np.array(bid_actions)
-
 
 def _get_obs_for_bid(player_id, bid_info, hand_cards):
     all_cards = [3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7,
@@ -956,7 +956,6 @@ def _get_obs_for_bid(player_id, bid_info, hand_cards):
         "multiply_info": multiply_info.astype(np.int8)
     }
     return obs
-
 
 def _get_obs_for_multiply(position, bid_info, hand_cards, landlord_cards):
     all_cards = [3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7,

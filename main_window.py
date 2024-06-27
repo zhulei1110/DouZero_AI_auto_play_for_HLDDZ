@@ -1,15 +1,12 @@
 from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QPushButton
+
+from helpers.ScreenHelper import ScreenHelper
 from worker import WorkerThread
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Tutorial")
-
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+        self.screenHelper = ScreenHelper()
         self.setWindowTitle("Doudizhu AI Worker")
         self.setGeometry(100, 100, 600, 480)
 
@@ -24,6 +21,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
         self.workerThread = None
+        self.screenHelper.setWindowSize()
 
     def handle_button(self):
         if self.workerThread is None:

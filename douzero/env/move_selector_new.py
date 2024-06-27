@@ -1,7 +1,6 @@
 # return all moves that can beat rivals, moves and rival_move should be same type
 import collections
 
-
 def common_handle(moves, rival_move):
     new_moves = list()
     for move in moves:

@@ -1,5 +1,5 @@
-import torch
 import numpy as np
+import torch
 
 from douzero.env.env_new import get_obs
 

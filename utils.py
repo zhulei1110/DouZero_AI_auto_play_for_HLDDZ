@@ -1,24 +1,8 @@
 from douzero.env.move_generator_new import MovesGener
 from douzero.env.move_detector import get_move_type
-from douzero.env import move_selector
+from douzero.env import move_selector_new
 
-EnvCard2RealCard = {
-    3: '3',
-    4: '4',
-    5: '5',
-    6: '6',
-    7: '7',
-    8: '8',
-    9: '9',
-    10: 'T',
-    11: 'J',
-    12: 'Q',
-    13: 'K',
-    14: 'A',
-    17: '2',
-    20: 'X',
-    30: 'D'
-}
+from constants import EnvCard2RealCard
 
 def action_to_str(action):
     if len(action) == 0:
@@ -80,7 +64,7 @@ def search_actions(my_cards, other_cards, path_list, rival_move=None, prev_moves
                 if mtype != 4 and mtype != 5 and len(other_bombs) > 0:
                     break
 
-                if len(move_selector.filter_type_n(mtype, other_moves, move)) == 0:
+                if len(move_selector_new.filter_type_n(mtype, other_moves, move)) == 0:
                     if rival_move is not None:
                         move_info = get_move_type(move)
                         if mtype != 5:
@@ -154,6 +138,9 @@ def check_42(path):
             return True
     return False
 
-def normalize_score(score, min_val=-5, max_val=5):
-    """将模型得分归一化到0-100的范围"""
-    return 100 * (score - min_val) / (max_val - min_val)
+def remove_chars_from_string(source_str, chars_to_remove):
+    for char in chars_to_remove:
+        # 如果字符在源字符串中出现，则从源字符串中删除该字符
+        if char in source_str:
+            source_str = source_str.replace(char, '', 1)
+    return source_str
