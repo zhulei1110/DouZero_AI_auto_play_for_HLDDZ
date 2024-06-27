@@ -23,10 +23,6 @@ from utils import remove_chars_from_string
 # 玩家位置（0：地主上家，1：地主，2：地主下家）
 PlayerPosition = ['landlord_up', 'landlord', 'landlord_down']
 
-def run_async_task_in_thread(loop, future):
-    asyncio.set_event_loop(loop)
-    loop.run_until_complete(future)
-
 class WorkerThread(QThread):
     # finished_signal = pyqtSignal()
 
