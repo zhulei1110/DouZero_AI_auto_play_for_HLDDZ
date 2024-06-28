@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import time
 
+from collections import defaultdict
 from enum import Enum
 from skimage.metrics import structural_similarity as ssim
 
@@ -53,6 +54,7 @@ class GameHelper:
         self.colorRecognizer = ColorRecognizer()
         self.imageLocator = imageLocator
         self.screenHelper = screenHelper
+        self.resizeScale = None
 
     async def __findCards(self, image, pos, mark, scale=None, confidence=0.8):
         if mark is None:
@@ -64,6 +66,7 @@ class GameHelper:
 
         if scale is None:
             scale = await self.imageLocator.get_resize_scale(image)
+            self.resizeScale = scale
 
         for card in RealCards:
             templateName = f'{mark}_{card}'
@@ -262,6 +265,64 @@ class GameHelper:
         result = await self.imageLocator.locate_match_on_screen(templateName=template, region=pos)
         return result
     
+    async def get_my_hand_card_pos(self, image, card):
+        area_name = ScreenshotArea.MY_HAND_CARDS.value
+        mark = self.mark_dict[area_name]
+        template_name = f'{mark}_{card}'
+
+        points = await self.imageLocator.locate_all_match_on_image(image, templateName=template_name, confidence=0.65)
+        if len(points) > 0:
+            result = min(points, key=lambda x: x[0])
+            return (result[0], result[1])
+        
+        return None
+    
+    async def get_my_hand_cards_pos_list(self, my_hand_cards=None):
+        if my_hand_cards is None:
+            my_hand_cards = await self.get_my_hand_cards()
+        
+        pos_list = None
+        cards_num = len(my_hand_cards)
+        if cards_num > 0:
+            screenshot, _ = await self.screenHelper.getScreenshot()
+            image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
+
+            pos_list = []
+            for i in range(cards_num):
+                card = my_hand_cards[i]
+                card_pos = await self.get_my_hand_card_pos(image, card)
+                pos_list.append(card_pos)
+                
+        return pos_list
+
+    async def clickCards(self, cardsToClick):
+        my_hand_cards = await self.get_my_hand_cards()
+        pos_list = await self.get_my_hand_cards_pos_list(my_hand_cards)
+        if pos_list is None:
+            return
+        
+        # 使用 defaultdict，defaultdict 允许重复的 key
+        cards_pos_dict = defaultdict(list)
+        for key, value in zip(my_hand_cards, pos_list):
+            cards_pos_dict[key].append(value)
+
+        # 将 defaultdict 转换为普通字典
+        cards_pos_dict = dict(cards_pos_dict)
+
+        # 创建空的 remove_dict
+        remove_dict = {key: [] for key in cards_pos_dict.keys()}
+
+        for i in cardsToClick:
+            if i in cards_pos_dict:
+                pos = cards_pos_dict[i][-1]
+                print(pos)
+                if pos:
+                    self.screenHelper.leftClick2(pos[0], pos[1])
+                    time.sleep(0.2)
+
+                    remove_dict[i].append(cards_pos_dict[i][-1])
+                    cards_pos_dict[i].remove(cards_pos_dict[i][-1])
+
     async def clickBtn(self, btnName):
         btnPos = self.screenHelper.getCapturePosition(areaName=btnName)
         result = await self.imageLocator.locate_match_on_screen(templateName=btnName, region=btnPos, confidence=0.7)

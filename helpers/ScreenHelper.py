@@ -2,6 +2,9 @@ import asyncio
 import cv2
 import numpy as np
 import pyautogui
+
+import win32api
+import win32con
 import win32gui
 import win32ui
 
@@ -197,3 +200,13 @@ class ScreenHelper:
 
         # 移动鼠标到指定位置并点击
         pyautogui.click(abs_x, abs_y)
+
+    def leftClick2(self, rel_x, rel_y):
+        abs_x = self.WindowLeft + rel_x
+        abs_y = self.WindowTop + rel_y
+
+        win32api.SetCursorPos((abs_x, abs_y))
+        tmp = win32api.MAKELONG(rel_x, rel_y)
+        win32gui.PostMessage(self.Handle, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
+        win32gui.SendMessage(self.Handle, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, tmp)
+        win32gui.SendMessage(self.Handle, win32con.WM_LBUTTONUP, win32con.MK_LBUTTON, tmp)

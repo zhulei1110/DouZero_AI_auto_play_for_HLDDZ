@@ -75,6 +75,8 @@ class WorkerThread(QThread):
         self.player_bidding_status = None
 
         self.ai_suggested_received = False
+        self.my_played_card_clicked = False
+
         self.action_message = None
         self.action_list = None
 
@@ -112,7 +114,7 @@ class WorkerThread(QThread):
             # 检测是否开局
             while self.worker_runing and not self.game_started:
                 await self.before_start()
-                time.sleep(1.2)
+                time.sleep(1)
 
             # 确认地主之后，并且数据尚未初始化
             while self.worker_runing and self.landlord_confirmed and not self.data_initialized:
@@ -212,7 +214,7 @@ class WorkerThread(QThread):
                     self.waiting_for_animation_to_end = True
                     print('等待我的动画结束...')
                     print()
-                    time.sleep(0.3)
+                    time.sleep(0.2)
 
                 self.waiting_for_animation_to_end = False
                 await self.getMyPlayedCards(firstOfRound)
@@ -222,7 +224,7 @@ class WorkerThread(QThread):
                     self.waiting_for_animation_to_end = True
                     print('等待右侧动画结束...')
                     print()
-                    time.sleep(0.3)
+                    time.sleep(0.2)
 
                 self.waiting_for_animation_to_end = False
                 await self.getRightPlayedCards(firstOfRound)
@@ -232,7 +234,7 @@ class WorkerThread(QThread):
                     self.waiting_for_animation_to_end = True
                     print('等待左侧动画结束...')
                     print()
-                    time.sleep(0.3)
+                    time.sleep(0.2)
                 
                 self.waiting_for_animation_to_end = False
                 await self.getLeftPlayedCards(firstOfRound)
@@ -395,7 +397,7 @@ class WorkerThread(QThread):
                     tempArr.append(result)
                 else:
                     tempArr.append("")
-                time.sleep(0.3)
+                time.sleep(0.25)
         
         rightPlayedCards = None
         if len(tempArr) == 3:
@@ -449,7 +451,7 @@ class WorkerThread(QThread):
                     tempArr.append(result)
                 else:
                     tempArr.append("")
-                time.sleep(0.3)
+                time.sleep(0.25)
         
         leftPlayedCards = None
         if len(tempArr) == 3:
@@ -503,6 +505,10 @@ class WorkerThread(QThread):
             ai_suggested_play_cards = self.action_message["action"]
             print(f"AI 建议出牌：{ai_suggested_play_cards}，胜率：{round(self.action_message['win_rate'], 3)}")
             print()
+
+            if not self.my_played_card_clicked:
+                await self.gameHelper.clickCards(ai_suggested_play_cards)
+                self.my_played_card_clicked = True
         
         myBuchu = None
         if not firstOfRound:
@@ -521,7 +527,7 @@ class WorkerThread(QThread):
                     tempArr.append(result)
                 else:
                     tempArr.append("")
-                time.sleep(0.3)
+                time.sleep(0.25)
         
         myPlayedCards = None
         if len(tempArr) == 3:
@@ -555,6 +561,7 @@ class WorkerThread(QThread):
             self.play_order_of_next = 1
             
             self.ai_suggested_received = False
+            self.my_played_card_clicked = False
 
     async def autoBidding(self):
         self.in_bidding_progress = True
