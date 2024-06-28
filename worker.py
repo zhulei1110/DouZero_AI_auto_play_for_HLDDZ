@@ -69,8 +69,10 @@ class WorkerThread(QThread):
         self.left_played_completed = False          # 左侧玩家是否完成一次出牌
         self.my_played_completed = False            # 我是否完成一次出牌
 
-        self.auto_bidding_in_progress = False
-        self.auto_redouble_in_progress = False
+        self.in_bidding_progress = False
+        self.in_redouble_progress = False
+
+        self.player_bidding_status = None
 
         self.ai_suggested_received = False
         self.action_message = None
@@ -97,6 +99,8 @@ class WorkerThread(QThread):
 
     async def run_task(self):
         self.worker_runing = True
+        self.player_bidding_status: dict[int, list[int]] = {}
+
         while self.worker_runing:
             print()
             print("----- WORKER STARTED -----")
@@ -234,9 +238,14 @@ class WorkerThread(QThread):
                 await self.getLeftPlayedCards(firstOfRound)
                 
             firstOfRound = False
+            if self.env is not None and self.env.game_over:
+                self.round_ended()
+                break
+
             game_overed = await self.gameHelper.check_if_game_overed()
             if game_overed and self.card_playing and self.game_started:
                 self.round_ended()
+                break
 
     def round_ended(self):
         self.round_count += 1
@@ -278,8 +287,12 @@ class WorkerThread(QThread):
         self.left_played_completed = False
         self.my_played_completed = False
 
-        self.auto_bidding_in_progress = False
-        self.auto_redouble_in_progress = False
+        self.in_bidding_progress = False
+        self.in_redouble_progress = False
+
+        self.my_bidding_status = None
+        self.right_bidding_status = None
+        self.left_bidding_status = None
 
         self.ai_suggested_received = False
         self.action_message = None
@@ -382,7 +395,7 @@ class WorkerThread(QThread):
                     tempArr.append(result)
                 else:
                     tempArr.append("")
-                time.sleep(0.2)
+                time.sleep(0.3)
         
         rightPlayedCards = None
         if len(tempArr) == 3:
@@ -400,7 +413,6 @@ class WorkerThread(QThread):
             print(f"右侧玩家 >>> 已出牌：{rightPlayedCards}")
             print()
         
-        # time.sleep(0.2)
         if (rightBuchu is not None) or rightPlayed:
             if rightPlayed:
                 self.other_hands_cards_str = remove_chars_from_string(self.other_hands_cards_str, rightPlayedCards)
@@ -437,7 +449,7 @@ class WorkerThread(QThread):
                     tempArr.append(result)
                 else:
                     tempArr.append("")
-                time.sleep(0.2)
+                time.sleep(0.3)
         
         leftPlayedCards = None
         if len(tempArr) == 3:
@@ -455,7 +467,6 @@ class WorkerThread(QThread):
             print(f"左侧玩家 >>> 已出牌：{leftPlayedCards}")
             print()
 
-        # time.sleep(0.2)
         if (leftBuchu is not None) or leftPlayed:
             if leftPlayed:
                 self.other_hands_cards_str = remove_chars_from_string(self.other_hands_cards_str, leftPlayedCards)
@@ -478,9 +489,6 @@ class WorkerThread(QThread):
         if not self.ai_suggested_received:
             action_message, action_list = self.env.step(self.my_position, update=False)
             action_list = action_list[:3]
-
-            print(f"action_message: {action_message}")
-            print(f"action_list: {action_list}")
 
             self.action_message = action_message
             self.action_list = action_list
@@ -513,7 +521,7 @@ class WorkerThread(QThread):
                     tempArr.append(result)
                 else:
                     tempArr.append("")
-                time.sleep(0.2)
+                time.sleep(0.3)
         
         myPlayedCards = None
         if len(tempArr) == 3:
@@ -531,7 +539,6 @@ class WorkerThread(QThread):
             print(f"我 >>> 已出牌：{myPlayedCards}")
             print()
         
-        # time.sleep(0.2)
         if (myBuchu is not None) or myPlayed:
             tempData = myPlayedCards if myPlayed else ""
             self.my_played_cards_env = [RealCard2EnvCard[c] for c in list(tempData)]
@@ -550,9 +557,15 @@ class WorkerThread(QThread):
             self.ai_suggested_received = False
 
     async def autoBidding(self):
-        self.auto_bidding_in_progress = True
+        self.in_bidding_progress = True
+        self.my_bidding_status = None
+        self.right_bidding_status = None
+        self.left_bidding_status = None
+
         win_rate = await self.get_bid_win_rate()
-        while self.worker_runing and self.auto_bidding_in_progress:
+        while self.worker_runing and self.in_bidding_progress:
+            await self.get_player_bidding_status()
+
             if self.auto_play_cards:
                 if win_rate > self.config.bid_threshold:
                     call_success = await self.gameHelper.clickBtn('call_landlord_btn')
@@ -571,14 +584,16 @@ class WorkerThread(QThread):
 
             three_cards = await self.gameHelper.get_three_cards()
             if len(three_cards) == 3:
-                self.auto_bidding_in_progress = False
+                self.in_bidding_progress = False
             
             time.sleep(0.2)
+        
+        self.check_player_bidding_status()
 
     async def autoRedouble(self):
-        self.auto_redouble_in_progress = True
+        self.in_redouble_progress = True
         win_rate = await self.get_game_win_rate()
-        while self.worker_runing and self.auto_redouble_in_progress:
+        while self.worker_runing and self.in_redouble_progress:
             if self.auto_play_cards:
                 success = False
                 if win_rate > self.config.super_redouble_threshold:
@@ -591,14 +606,94 @@ class WorkerThread(QThread):
                     success = await self.gameHelper.clickBtn('not_redouble_btn')
                 
                 if success:
-                    self.auto_redouble_in_progress = False
+                    self.in_redouble_progress = False
                     self.landlord_confirmed = True
             else:
-                self.auto_redouble_in_progress = False
+                self.in_redouble_progress = False
                 self.landlord_confirmed = True
 
             time.sleep(0.2)
 
+    async def get_player_bidding_status(self):
+        round_num = self.round_count
+
+        if self.my_bidding_status is None:
+            myBj = await self.gameHelper.get_my_played_text(template='bujiao')
+            if myBj is not None:
+                self.my_bidding_status = 0
+                self.update_player_bidding_status(round_num)
+            
+            myJdz = await self.gameHelper.get_my_played_text(template='jiaodizhu')
+            if myJdz is not None:
+                self.my_bidding_status = 1
+                self.update_player_bidding_status(round_num)
+
+            myBq = await self.gameHelper.get_my_played_text(template='buqiang')
+            if myBq is not None:
+                self.my_bidding_status = 2
+                self.update_player_bidding_status(round_num)
+
+            myQdz = await self.gameHelper.get_my_played_text(template='qiangdizhu')
+            if myQdz is not None:
+                self.my_bidding_status = 3
+                self.update_player_bidding_status(round_num)
+        
+        if self.right_bidding_status is None:
+            rightBj = await self.gameHelper.get_right_played_text(template='bujiao')
+            if rightBj is not None:
+                self.right_bidding_status = 0
+                self.update_player_bidding_status(round_num)
+            
+            rightJdz = await self.gameHelper.get_right_played_text(template='jiaodizhu')
+            if rightJdz is not None:
+                self.right_bidding_status = 1
+                self.update_player_bidding_status(round_num)
+            
+            rightBq = await self.gameHelper.get_right_played_text(template='buqiang')
+            if rightBq is not None:
+                self.right_bidding_status = 2
+                self.update_player_bidding_status(round_num)
+            
+            rightQdz = await self.gameHelper.get_right_played_text(template='qiangdizhu')
+            if rightQdz is not None:
+                self.right_bidding_status = 3
+                self.update_player_bidding_status(round_num)
+        
+        if self.left_bidding_status is None:
+            leftBj = await self.gameHelper.get_left_played_text(template='bujiao')
+            if leftBj is not None:
+                self.left_bidding_status = 0
+                self.update_player_bidding_status(round_num)
+
+            leftJdz = await self.gameHelper.get_left_played_text(template='jiaodizhu')
+            if leftJdz is not None:
+                self.left_bidding_status = 1
+                self.update_player_bidding_status(round_num)
+
+            leftBq = await self.gameHelper.get_left_played_text(template='buqiang')
+            if leftBq is not None:
+                self.left_bidding_status = 2
+
+            leftQdz = await self.gameHelper.get_left_played_text(template='qiangdizhu')
+            if leftQdz is not None:
+                self.left_bidding_status = 3
+
+    def check_player_bidding_status(self):
+        print(self.player_bidding_status)
+
+        round_num = self.round_count
+        if (round_num in self.player_bidding_status) and all(value == 0 for value in self.player_bidding_status[round_num]):
+            prev_no_bid = all(value == 0 for value in self.player_bidding_status[round_num - 1])
+            before_prev_no_bid = all(value == 0 for value in self.player_bidding_status[round_num - 2])
+            if prev_no_bid == True and before_prev_no_bid == True:
+                print("连续3局无人叫地主，首家默认为地主")
+            else:
+                print("本局无人叫地主，重新发牌")
+                self.round_ended()
+
+    def update_player_bidding_status(self, round_num):
+        self.player_bidding_status[round_num] = [self.my_bidding_status, self.right_bidding_status, self.left_bidding_status]
+    
     def create_ai_representer(self):
         AI = [0, 0]
         AI[0] = self.my_position

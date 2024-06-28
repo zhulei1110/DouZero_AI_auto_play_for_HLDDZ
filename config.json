@@ -1,6 +1,6 @@
 {
-    "window_width": 1600,
-    "window_height": 900,
+    "window_width": 1920,
+    "window_height": 1080,
     "window_class_name": "UnityWndClass",
     "screenshot_image_logs": false,
     "template_match_image_logs": false,

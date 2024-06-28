@@ -147,6 +147,7 @@ class GameEnv(object):
         return False
 
     def step(self, position, action=None, update=True):
+        # print(f"GameEnv step() 被调用, position = {position}, action = {action}, update = {update}")
         if action is not None and len(action) > 0:
             action_list = [[action, 0]]
             win_rate = 0
@@ -331,16 +332,16 @@ class GameEnv(object):
         if action != []:
             # 更新玩家手牌，删除对应的牌
             if self.acting_player_position == self.players[0]:
-                # print("env log: 已更新当前玩家（我的）手牌")
-                # print()
                 for card in action:
-                    self.info_sets[self.acting_player_position].player_hand_cards.remove(card)
+                    if card in self.info_sets[self.acting_player_position].player_hand_cards:
+                        self.info_sets[self.acting_player_position].player_hand_cards.remove(card)
+                    else:
+                        print(f"env log: Card {card} not found in {self.acting_player_position} hand cards.")
             else:
-                # print("env log: 已更新另外两个玩家手牌（删除相同数量的牌）")
-                # print()
                 del self.info_sets[self.acting_player_position].player_hand_cards[0:len(action)]
 
             self.info_sets[self.acting_player_position].player_hand_cards.sort()
+
 
     # 获取当前玩家可以合法出牌的所有可能动作
     def get_legal_card_play_actions(self):
