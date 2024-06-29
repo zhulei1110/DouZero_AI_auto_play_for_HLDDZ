@@ -10,7 +10,9 @@ from helpers.ColorRecognizer import ColorRecognizer
 from helpers.ImageLocator import ImageLocator
 from helpers.ScreenHelper import ScreenHelper, ScreenshotArea
 
-from constants import RealCards
+from constants import RealCards, RealCard2EnvCard
+from douzero.env import move_detector as md
+
 
 # 牌检测结果滤波
 # 过滤掉相互距离太近的牌，只保留相距超过一定距离的牌
@@ -35,6 +37,109 @@ def cards_filter(location, distance):
 
     return count, posList
 
+
+def find_repeated_cards_click_position(cards, cards_pos_dict):
+    result = {}
+    cards_count = {card: cards.count(card) for card in set(cards)}  # 统计传入的每种卡牌的数量
+
+    for card in cards:
+        if card in cards_pos_dict:
+            if card not in result:
+                result[card] = []
+            card_positions = cards_pos_dict[card]
+            count_needed = cards_count[card]
+            count_selected = len(result[card])
+
+            while count_selected < count_needed and count_selected < len(card_positions):
+                result[card].append(card_positions[count_selected])
+                count_selected += 1
+
+    # 确保每种卡牌只取到需要的数量，并且如果有多个，则取第一个和最后一个
+    for card in result:
+        if len(result[card]) > 1:
+            result[card] = [result[card][0], result[card][-1]]
+        elif len(result[card]) == 1:
+            result[card] = [result[card][0]]
+
+    return result
+
+def find_serial_cards_click_position(cards, cards_pos_dict):
+    result = None
+    
+    # 顺子第一张和最后一张牌
+    first_card = cards[0]
+    last_card = cards[-1]
+    
+    if first_card in cards_pos_dict and last_card in cards_pos_dict:
+        first_position = cards_pos_dict[first_card][0]
+        last_position = cards_pos_dict[last_card][0]
+        result = [first_position, last_position]
+    
+    return result
+
+
+def find_max_top_and_min_top(cards_pos_dict, exclude_keys=['D', 'X']):
+    max_top = float('-inf')
+    min_top = float('inf')
+
+    for card, positions in cards_pos_dict.items():
+        if card in exclude_keys:
+            continue
+
+        for pos in positions:
+            top = pos[1]
+            if top > max_top:
+                max_top = top
+            if top < min_top:
+                min_top = top
+
+    return max_top, min_top
+
+def find_positions_with_min_top(cards_pos_dict, min_top, tolerance=3):
+    result = {}
+
+    for card, positions in cards_pos_dict.items():
+        for pos in positions:
+            if min_top <= pos[1] <= min_top + tolerance:
+                if card not in result:
+                    result[card] = []
+                result[card].append(pos)
+
+    return result
+
+def find_missing_cards_and_extra_cards(cards_pos_dict, play_cards, selected_pos_dict):
+    selected_card_count_dict = {}
+    play_card_count_dict = {}
+
+    # 统计已选中卡牌的数量
+    for card, positions in selected_pos_dict.items():
+        selected_card_count_dict[card] = len(positions)
+
+    # 统计要打出的卡牌的数量
+    for card in play_cards:
+        if card in play_card_count_dict:
+            play_card_count_dict[card] += 1
+        else:
+            play_card_count_dict[card] = 1
+
+    missing_cards = {}
+    extra_cards = {}
+
+    # 找出缺少的牌
+    for card, count in play_card_count_dict.items():
+        if card not in selected_card_count_dict or selected_card_count_dict[card] < count:
+            needed_count = count - selected_card_count_dict.get(card, 0)
+            missing_cards[card] = cards_pos_dict[card][:needed_count]
+
+    # 找出多余的牌
+    for card, count in selected_card_count_dict.items():
+        if card not in play_card_count_dict or play_card_count_dict[card] < count:
+            extra_count = count - play_card_count_dict.get(card, 0)
+            extra_cards[card] = selected_pos_dict[card][:extra_count]
+
+    return missing_cards, extra_cards
+
+
 class AnimationArea(Enum):
     RIGHT_PLAYED_ANIMATION = "right_played_animation"
     LEFT_PLAYED_ANIMATION = "left_played_animation"
@@ -55,6 +160,7 @@ class GameHelper:
         self.imageLocator = imageLocator
         self.screenHelper = screenHelper
         self.resizeScale = None
+        self.tolerance = 3
 
     async def __findCards(self, image, pos, mark, scale=None, confidence=0.8):
         if mark is None:
@@ -265,18 +371,21 @@ class GameHelper:
         result = await self.imageLocator.locate_match_on_screen(templateName=template, region=pos)
         return result
     
-    async def get_my_hand_card_pos(self, image, card):
+    async def get_my_hand_card_pos(self, image, card, used_left_pos_list):
         area_name = ScreenshotArea.MY_HAND_CARDS.value
         mark = self.mark_dict[area_name]
         template_name = f'{mark}_{card}'
 
-        points = await self.imageLocator.locate_all_match_on_image(image, templateName=template_name, confidence=0.65)
-        if len(points) > 0:
-            result = min(points, key=lambda x: x[0])
-            return (result[0], result[1])
-        
+        result = await self.imageLocator.locate_all_match_on_image(image, templateName=template_name, confidence=0.7)
+        if len(result) > 0:
+            count, posList = cards_filter(list(result), self.distance)
+            points = [pos for pos in posList if pos[0] not in used_left_pos_list]
+            if points:
+                cardPos = min(points, key=lambda x: x[0])
+                return (cardPos[0], cardPos[1])
+            
         return None
-    
+
     async def get_my_hand_cards_pos_list(self, my_hand_cards=None):
         if my_hand_cards is None:
             my_hand_cards = await self.get_my_hand_cards()
@@ -288,40 +397,87 @@ class GameHelper:
             image = cv2.cvtColor(np.asarray(screenshot), cv2.COLOR_RGB2BGR)
 
             pos_list = []
+            used_left_pos_list = set()
             for i in range(cards_num):
                 card = my_hand_cards[i]
-                card_pos = await self.get_my_hand_card_pos(image, card)
-                pos_list.append(card_pos)
-                
+                card_pos = await self.get_my_hand_card_pos(image, card, used_left_pos_list)
+                if card_pos:
+                    pos_list.append(card_pos)
+                    used_left_pos_list.add(card_pos[0])  # 只添加 left 值
+                    
         return pos_list
 
-    async def clickCards(self, cardsToClick):
+    async def verify_and_reselect(self, my_hand_cards, play_cards):
+        pos_list = await self.get_my_hand_cards_pos_list(my_hand_cards)
+        if pos_list is None:
+            return
+        
+        cards_pos_defaultdict = defaultdict(list)
+        for key, value in zip(my_hand_cards, pos_list):
+            cards_pos_defaultdict[key].append(value)
+
+        cards_pos_dict = dict(cards_pos_defaultdict)
+        max_top, min_top = find_max_top_and_min_top(cards_pos_dict)
+        selected_pos_dict = find_positions_with_min_top(cards_pos_dict, min_top)
+        missing_cards, extra_cards = find_missing_cards_and_extra_cards(cards_pos_dict, play_cards, selected_pos_dict)
+        print('missing_cards:', missing_cards)
+        print('extra_cards:', extra_cards)
+
+    async def clickCards(self, cards):
         my_hand_cards = await self.get_my_hand_cards()
         pos_list = await self.get_my_hand_cards_pos_list(my_hand_cards)
         if pos_list is None:
             return
         
-        # 使用 defaultdict，defaultdict 允许重复的 key
-        cards_pos_dict = defaultdict(list)
+        # defaultdict 允许重复的 key
+        cards_pos_defaultdict = defaultdict(list)
         for key, value in zip(my_hand_cards, pos_list):
-            cards_pos_dict[key].append(value)
+            cards_pos_defaultdict[key].append(value)
 
-        # 将 defaultdict 转换为普通字典
-        cards_pos_dict = dict(cards_pos_dict)
+        # 点击前的所有手牌位置（将 defaultdict 转换为普通字典）
+        cards_pos_dict = dict(cards_pos_defaultdict)
 
-        # 创建空的 remove_dict
-        remove_dict = {key: [] for key in cards_pos_dict.keys()}
+        action = [RealCard2EnvCard[c] for c in list(cards)]
+        m_type = md.get_move_type(action)
+        if m_type["type"] not in [md.TYPE_1_SINGLE, md.TYPE_8_SERIAL_SINGLE]:
+            click_pos_dict = find_repeated_cards_click_position(cards, cards_pos_dict)
+            print(click_pos_dict)
+            if len(click_pos_dict) > 0:
+                for card, coords in click_pos_dict.items():
+                    if len(coords) == 2:
+                        start_x, start_y = coords[0]
+                        end_x, end_y = coords[1]
+                        self.screenHelper.leftClickAndDrag(start_x, start_y, end_x, end_y)
+                        # print(f"卡牌 {card} 已被选中多张")
+                        # print()
+                        time.sleep(0.2)
+                    elif len(coords) == 1:
+                        x, y = coords[0]
+                        self.screenHelper.leftClick2(x, y)
+                        # print(f"卡牌 {card} 已被点击选中")
+                        # print()
+                        time.sleep(0.2)
 
-        for i in cardsToClick:
-            if i in cards_pos_dict:
-                pos = cards_pos_dict[i][-1]
-                print(pos)
-                if pos:
-                    self.screenHelper.leftClick2(pos[0], pos[1])
-                    time.sleep(0.2)
+        if m_type["type"] == md.TYPE_8_SERIAL_SINGLE:
+            pos_list = find_serial_cards_click_position(cards, cards_pos_dict)
+            if pos_list:
+                start_x, start_y = pos_list[0]
+                end_x, end_y = pos_list[1]
+                self.screenHelper.leftClickAndDrag(start_x, start_y, end_x, end_y)
+                # print(f"顺子 {cards} 已被选中多张")
+                # print()
+                time.sleep(0.2)
 
-                    remove_dict[i].append(cards_pos_dict[i][-1])
-                    cards_pos_dict[i].remove(cards_pos_dict[i][-1])
+        if m_type["type"] == md.TYPE_1_SINGLE:
+            pos_list = cards_pos_dict[cards[0]]
+            if pos_list:
+                x, y = pos_list[0]
+                self.screenHelper.leftClick2(x, y)
+                # print(f"卡牌 {cards} 已被点击选中")
+                # print()
+                time.sleep(0.2)
+
+        self.verify_and_reselect(my_hand_cards, play_cards=cards)
 
     async def clickBtn(self, btnName):
         btnPos = self.screenHelper.getCapturePosition(areaName=btnName)

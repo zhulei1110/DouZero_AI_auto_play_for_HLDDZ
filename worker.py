@@ -35,7 +35,7 @@ class WorkerThread(QThread):
 
         self.worker_runing = False              # 线程是否在运行
 
-        self.auto_play_cards = False            # 是否自动打牌（无需人为操作）
+        self.auto_play_cards = True            # 是否自动打牌（无需人为操作）
         self.in_game_start_screen = False       # 是否进入开始游戏界面
         self.game_started = False               # 游戏是否已开局
         self.landlord_confirmed = False         # 是否已确认地主
@@ -142,7 +142,9 @@ class WorkerThread(QThread):
         self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
         while self.worker_runing and not self.in_game_start_screen:
             if self.auto_play_cards:
-                await self.gameHelper.clickBtn('quick_start_btn')
+                success = await self.gameHelper.clickBtn('quick_start_btn')
+                if not success:
+                    success = await self.gameHelper.clickBtn('continue_game_btn')
             print("等待手动进入开始游戏界面...")
             self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
             time.sleep(1)
@@ -168,11 +170,6 @@ class WorkerThread(QThread):
             self.game_started = True
 
             await self.autoBidding()
-
-            # 需要记录3人的叫地主情况
-            # 如果3人都不叫地主，将会重新发牌，重新开局
-            # 3人连续都不叫地主的局数最多3局，前2局会重新发牌，第3局就首家默认是地主
-
             await self.getThreeCards()
             await self.getMyPosition()
             await self.getMyHandCards()
@@ -241,6 +238,7 @@ class WorkerThread(QThread):
                 
             firstOfRound = False
             if self.env is not None and self.env.game_over:
+                time.sleep(3)
                 self.round_ended()
                 break
 
@@ -297,6 +295,8 @@ class WorkerThread(QThread):
         self.left_bidding_status = None
 
         self.ai_suggested_received = False
+        self.my_played_card_clicked = False
+
         self.action_message = None
         self.action_list = None
 
@@ -501,14 +501,21 @@ class WorkerThread(QThread):
         if self.action_message["action"] == "":
             print(f"AI 建议不出牌")
             print()
+            if self.auto_play_cards:
+                success = await self.gameHelper.clickBtn('not_play_cards_btn')
+                if not success:
+                    success = await self.gameHelper.clickBtn('can_not_play_cards_btn')
         else:
             ai_suggested_play_cards = self.action_message["action"]
             print(f"AI 建议出牌：{ai_suggested_play_cards}，胜率：{round(self.action_message['win_rate'], 3)}")
             print()
 
-            if not self.my_played_card_clicked:
-                await self.gameHelper.clickCards(ai_suggested_play_cards)
-                self.my_played_card_clicked = True
+            if self.auto_play_cards:
+                if not self.my_played_card_clicked:
+                    await self.gameHelper.clickCards(ai_suggested_play_cards)
+                    time.sleep(0.5)
+                    await self.gameHelper.clickBtn('play_cards_btn')
+                    self.my_played_card_clicked = True
         
         myBuchu = None
         if not firstOfRound:
@@ -686,14 +693,16 @@ class WorkerThread(QThread):
                 self.left_bidding_status = 3
 
     def check_player_bidding_status(self):
-        print(self.player_bidding_status)
-
         round_num = self.round_count
         if (round_num in self.player_bidding_status) and all(value == 0 for value in self.player_bidding_status[round_num]):
-            prev_no_bid = all(value == 0 for value in self.player_bidding_status[round_num - 1])
-            before_prev_no_bid = all(value == 0 for value in self.player_bidding_status[round_num - 2])
-            if prev_no_bid == True and before_prev_no_bid == True:
-                print("连续3局无人叫地主，首家默认为地主")
+            if round_num > 1:
+                prev_no_bid = all(value == 0 for value in self.player_bidding_status[round_num - 1])
+                before_prev_no_bid = all(value == 0 for value in self.player_bidding_status[round_num - 2])
+                if prev_no_bid == True and before_prev_no_bid == True:
+                    print("连续3局无人叫地主，首家默认为地主")
+                else:
+                    print("本局无人叫地主，重新发牌")
+                    self.round_ended()
             else:
                 print("本局无人叫地主，重新发牌")
                 self.round_ended()

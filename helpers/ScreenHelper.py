@@ -1,6 +1,7 @@
 import asyncio
 import cv2
 import numpy as np
+import time
 import pyautogui
 
 import win32api
@@ -210,3 +211,32 @@ class ScreenHelper:
         win32gui.PostMessage(self.Handle, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
         win32gui.SendMessage(self.Handle, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, tmp)
         win32gui.SendMessage(self.Handle, win32con.WM_LBUTTONUP, win32con.MK_LBUTTON, tmp)
+
+    def leftClickAndDrag(self, start_rel_x, start_rel_y, end_rel_x, end_rel_y):
+        start_abs_x = self.WindowLeft + start_rel_x
+        start_abs_y = self.WindowTop + start_rel_y
+        end_abs_x = self.WindowLeft + end_rel_x
+        end_abs_y = self.WindowTop + end_rel_y
+
+        # 将鼠标移动到起始点
+        win32api.SetCursorPos((start_abs_x, start_abs_y))
+        
+        # 按下鼠标左键
+        start_tmp = win32api.MAKELONG(start_rel_x, start_rel_y)
+        win32gui.PostMessage(self.Handle, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
+        win32gui.SendMessage(self.Handle, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, start_tmp)
+        
+        # 移动到终点，逐步移动
+        steps = 50  # 移动步数，可以调整这个值以控制移动的平滑度
+        for i in range(steps):
+            intermediate_x = int(start_abs_x + (end_abs_x - start_abs_x) * i / (steps - 1))
+            intermediate_y = int(start_abs_y + (end_abs_y - start_abs_y) * i / (steps - 1))
+            win32api.SetCursorPos((intermediate_x, intermediate_y))
+            time.sleep(0.01)  # 确保每一步的移动都有足够时间被处理
+        
+        # 移动到终点
+        win32api.SetCursorPos((end_abs_x, end_abs_y))
+        
+        # 松开鼠标左键
+        end_tmp = win32api.MAKELONG(end_rel_x, end_rel_y)
+        win32gui.SendMessage(self.Handle, win32con.WM_LBUTTONUP, win32con.MK_LBUTTON, end_tmp)
