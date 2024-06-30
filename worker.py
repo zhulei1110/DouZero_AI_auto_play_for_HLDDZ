@@ -609,22 +609,20 @@ class WorkerThread(QThread):
         win_rate = await self.get_game_win_rate()
         while self.worker_runing and self.in_redouble_progress:
             if self.auto_play_cards:
-                success = False
                 if win_rate > self.config.super_redouble_threshold:
                     success = await self.gameHelper.clickBtn('super_redouble_btn')
                     if not success:
                         success = await self.gameHelper.clickBtn('redouble_btn')
                 elif win_rate > self.config.redouble_threshold:
-                    success = await self.gameHelper.clickBtn('redouble_btn')
+                    await self.gameHelper.clickBtn('redouble_btn')
                 else:
-                    success = await self.gameHelper.clickBtn('not_redouble_btn')
+                    await self.gameHelper.clickBtn('not_redouble_btn')
                 
-                if success:
-                    self.in_redouble_progress = False
-                    self.landlord_confirmed = True
-            else:
-                self.in_redouble_progress = False
                 self.landlord_confirmed = True
+                self.in_redouble_progress = False
+            else:
+                self.landlord_confirmed = True
+                self.in_redouble_progress = False
 
             time.sleep(0.2)
 
