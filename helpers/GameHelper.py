@@ -315,7 +315,7 @@ class GameHelper:
         mark = self.mark_dict[area_name]
         template_name = f'{mark}_{card}'
 
-        result = await self.imageLocator.locate_all_match_on_image(image, templateName=template_name, confidence=0.75)
+        result = await self.imageLocator.locate_all_match_on_image(image, templateName=template_name, confidence=0.8)
         if len(result) > 0:
             count, posList = cards_filter(list(result), self.distance)
             points = [pos for pos in posList if pos[0] not in used_left_pos_list]
@@ -348,12 +348,20 @@ class GameHelper:
 
     def __check_selected_cards(self, initial_dict, selected_dict, selected_cards):
         actual_selected = []
+        actual_selected_dict = {}
+
         for card, positions in initial_dict.items():
             for i, (left, top) in enumerate(positions):
                 if card in selected_dict and i < len(selected_dict[card]):
                     new_left, new_top = selected_dict[card][i]
                     if top - new_top > 5:
                         actual_selected.append(card)
+                        if card not in actual_selected_dict:
+                            actual_selected_dict[card] = []
+                        actual_selected_dict[card].append((new_left, new_top))
+
+        print(f'actual_selected_dict: {actual_selected_dict}')
+        print()
 
         # 统计 AI 选择的每张卡牌的数量
         from collections import Counter
@@ -379,7 +387,7 @@ class GameHelper:
                     # 点击还未被选中的卡牌位置
                     positions = initial_dict[card]
                     for position in positions:
-                        if position not in selected_dict[card]:
+                        if position not in actual_selected_dict[card]:
                             x, y = position
                             self.screenHelper.leftClick2(x, y)
                             break
@@ -390,7 +398,7 @@ class GameHelper:
                     # 点击已经被选中的卡牌位置
                     positions = selected_dict[card]
                     for position in positions:
-                        if position in selected_dict[card]:
+                        if position in actual_selected_dict[card]:
                             x, y = position
                             self.screenHelper.leftClick2(x, y)
                             break
@@ -412,12 +420,15 @@ class GameHelper:
 
         print(f"initial_pos_dict: {initial_pos_dict}")
         print()
+        
         print(f"selected_pos_dict: {selected_pos_dict}")
         print()
 
         missing_cards, extra_cards = self.__check_selected_cards(initial_pos_dict, selected_pos_dict, selected_cards)
+
         print(f'missing_cards: {missing_cards}')
         print()
+
         print(f'extra_cards: {extra_cards}')
         print()
         
@@ -440,21 +451,18 @@ class GameHelper:
         m_type = md.get_move_type(action)
         if m_type["type"] not in [md.TYPE_1_SINGLE, md.TYPE_8_SERIAL_SINGLE]:
             click_pos_dict = find_repeated_cards_click_position(cards, cards_pos_dict)
-            print(click_pos_dict)
+            # print(f'被点击的手牌及其坐标: {click_pos_dict}')
+            # print()
             if len(click_pos_dict) > 0:
                 for card, coords in click_pos_dict.items():
                     if len(coords) == 2:
                         start_x, start_y = coords[0]
                         end_x, end_y = coords[1]
                         self.screenHelper.leftClickAndDrag(start_x, start_y, end_x, end_y)
-                        # print(f"卡牌 {card} 已被选中多张")
-                        # print()
                         time.sleep(0.2)
                     elif len(coords) == 1:
                         x, y = coords[0]
                         self.screenHelper.leftClick2(x, y)
-                        # print(f"卡牌 {card} 已被点击选中")
-                        # print()
                         time.sleep(0.2)
 
         if m_type["type"] == md.TYPE_8_SERIAL_SINGLE:
@@ -463,8 +471,6 @@ class GameHelper:
                 start_x, start_y = pos_list[0]
                 end_x, end_y = pos_list[1]
                 self.screenHelper.leftClickAndDrag(start_x, start_y, end_x, end_y)
-                # print(f"顺子 {cards} 已被选中多张")
-                # print()
                 time.sleep(0.2)
 
         if m_type["type"] == md.TYPE_1_SINGLE:
@@ -472,8 +478,6 @@ class GameHelper:
             if pos_list:
                 x, y = pos_list[0]
                 self.screenHelper.leftClick2(x, y)
-                # print(f"卡牌 {cards} 已被点击选中")
-                # print()
                 time.sleep(0.2)
 
         await self.verify_and_reselect(initial_pos_dict, play_cards=cards)
