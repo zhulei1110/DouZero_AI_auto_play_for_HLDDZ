@@ -1,5 +1,6 @@
 import asyncio
 import cv2
+import math
 import numpy as np
 import time
 import pyautogui
@@ -225,9 +226,15 @@ class ScreenHelper:
         start_tmp = win32api.MAKELONG(start_rel_x, start_rel_y)
         win32gui.PostMessage(self.Handle, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
         win32gui.SendMessage(self.Handle, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, start_tmp)
+
+        # 计算起点和终点之间的距离
+        distance = math.sqrt((end_abs_x - start_abs_x) ** 2 + (end_abs_y - start_abs_y) ** 2)
+        
+        # 动态计算步数，确保移动的平滑度
+        steps = max(25, int(distance / 5))  # 每5像素一个步数，至少25步
         
         # 移动到终点，逐步移动
-        steps = 50  # 移动步数，可以调整这个值以控制移动的平滑度
+        # steps = 50  # 移动步数，可以调整这个值以控制移动的平滑度
         for i in range(steps):
             intermediate_x = int(start_abs_x + (end_abs_x - start_abs_x) * i / (steps - 1))
             intermediate_y = int(start_abs_y + (end_abs_y - start_abs_y) * i / (steps - 1))

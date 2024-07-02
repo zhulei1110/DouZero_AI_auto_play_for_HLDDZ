@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import time
 
-from collections import defaultdict
+from collections import defaultdict, Counter
 from enum import Enum
 from skimage.metrics import structural_similarity as ssim
 
@@ -77,6 +77,27 @@ def find_serial_cards_click_position(cards, cards_pos_dict):
         result = [first_position, last_position]
     
     return result
+
+def compare_dict_consistent(dict1, dict2, tolerance=5):
+    # 比较两个字典的键
+    if dict1.keys() != dict2.keys():
+        return False
+    
+    # 比较每个键的值
+    for key in dict1:
+        values1 = dict1[key]
+        values2 = dict2[key]
+        
+        # 比较值数组的长度
+        if len(values1) != len(values2):
+            return False
+        
+        # 比较每个 (left, top) 值
+        for (left1, top1), (left2, top2) in zip(values1, values2):
+            if abs(top1 - top2) > tolerance:
+                return False
+    
+    return True
 
 
 class AnimationArea(Enum):
@@ -346,97 +367,126 @@ class GameHelper:
                     
         return pos_list
 
-    def __check_selected_cards(self, initial_dict, selected_dict, selected_cards):
-        actual_selected = []
-        actual_selected_dict = {}
+    def __get_actual_selected_cards_data(self, initial_dict, after_selected_dict):
+        actual_selected_cards = []
+        actual_selected_cards_dict = {}
 
+        # 遍历初始的卡牌坐标字典
         for card, positions in initial_dict.items():
+            # 遍历每一张卡牌的坐标（重复的卡牌对应多个坐标）
             for i, (left, top) in enumerate(positions):
-                if card in selected_dict and i < len(selected_dict[card]):
-                    new_left, new_top = selected_dict[card][i]
+                if card in after_selected_dict and i < len(after_selected_dict[card]):
+                    new_left, new_top = after_selected_dict[card][i]
+                    # 没被选中的卡牌的top值 大于 选中后的卡牌的top值
                     if top - new_top > 5:
-                        actual_selected.append(card)
-                        if card not in actual_selected_dict:
-                            actual_selected_dict[card] = []
-                        actual_selected_dict[card].append((new_left, new_top))
-
-        print(f'actual_selected_dict: {actual_selected_dict}')
-        print()
-
-        # 统计 AI 选择的每张卡牌的数量
-        from collections import Counter
-        selected_count = Counter(selected_cards)
-        actual_selected_count = Counter(actual_selected)
-
-        missing_cards = []
-        extra_cards = []
+                        actual_selected_cards.append(card)
+                        if card not in actual_selected_cards_dict:
+                            actual_selected_cards_dict[card] = []
+                        actual_selected_cards_dict[card].append((new_left, new_top))
         
-        # 找出缺失的卡牌
-        for card, count in selected_count.items():
+        return actual_selected_cards, actual_selected_cards_dict
+    
+    def __get_missing_cards(self, need_played_cards, actual_selected_cards):
+        missing_cards = []
+
+        need_played_count = Counter(need_played_cards)
+        actual_selected_count = Counter(actual_selected_cards)
+
+        for card, count in need_played_count.items():
             if actual_selected_count[card] < count:
                 missing_cards.extend([card] * (count - actual_selected_count[card]))
-        
-        # 找出多余的卡牌
+
+        return missing_cards
+    
+    def __get_extra_cards(self, need_played_cards, actual_selected_cards):
+        extra_cards = []
+
+        need_played_count = Counter(need_played_cards)
+        actual_selected_count = Counter(actual_selected_cards)
+
         for card, count in actual_selected_count.items():
-            if selected_count[card] < count:
-                extra_cards.extend([card] * (count - selected_count[card]))
-
-        if len(missing_cards) > 0:
-            for card in missing_cards:
-                if card in initial_dict:
-                    # 点击还未被选中的卡牌位置
-                    positions = initial_dict[card]
-                    for position in positions:
-                        if position not in actual_selected_dict[card]:
-                            x, y = position
-                            self.screenHelper.leftClick2(x, y)
-                            break
+            if need_played_count[card] < count:
+                extra_cards.extend([card] * (count - need_played_count[card]))
         
-        if len(extra_cards) > 0:
-            for card in extra_cards:
-                if card in initial_dict:
-                    # 点击已经被选中的卡牌位置
-                    positions = selected_dict[card]
-                    for position in positions:
-                        if position in actual_selected_dict[card]:
-                            x, y = position
-                            self.screenHelper.leftClick2(x, y)
-                            break
-        
-        return missing_cards, extra_cards
+        return extra_cards
+    
+    def __check_missing_and_extra_cards(self, initial_dict, after_selected_dict, need_played_cards):
+        print(f'initial_dict: {initial_dict}')
+        print()
+        print(f'after_selected_dict: {after_selected_dict}')
+        print()
+        print(f'need_played_cards: {need_played_cards}')
+        print()
 
-    async def verify_and_reselect(self, initial_pos_dict, play_cards):
+        actual_selected_cards, actual_selected_cards_dict = self.__get_actual_selected_cards_data(initial_dict, after_selected_dict)
+        if len(actual_selected_cards) == 0 or len(actual_selected_cards_dict) == 0:
+            play_cards = ''.join(need_played_cards)
+            self.clickCards(play_cards)
+        else:
+            # 所有实际被选中卡牌的 left值 的列表
+            cards_left_list = []
+            for card in actual_selected_cards_dict:
+                for position in actual_selected_cards_dict[card]:
+                    cards_left_list.append(position[00])
+
+            print(f'actual_selected_cards_dict: {actual_selected_cards_dict}')
+            print()
+            print(f'cards_left_list: {cards_left_list}')
+            print()
+            
+            extra_cards = self.__get_extra_cards(need_played_cards, actual_selected_cards)
+            print(f'extra_cards: {extra_cards}')
+            print()
+            if len(extra_cards) > 0:
+                for card in extra_cards:
+                    if card in initial_dict:
+                        after_pos_list = after_selected_dict[card]
+                        for after_pos in after_pos_list:
+                            after_left = after_pos[0]
+                            if (card in actual_selected_cards_dict) and (after_left in cards_left_list):
+                                x, y = after_pos
+                                self.screenHelper.leftClick2(x, y)
+                                break
+
+            missing_cards = self.__get_missing_cards(need_played_cards, actual_selected_cards)
+            print(f'missing_cards: {missing_cards}')
+            print()
+            if len(missing_cards) > 0:
+                for card in missing_cards:
+                    if card in initial_dict:
+                        init_pos_list = initial_dict[card]
+                        for init_pos in init_pos_list:
+                            init_left = init_pos[0]
+                            if (card not in actual_selected_cards_dict) or (init_left not in cards_left_list):
+                                x, y = init_pos
+                                self.screenHelper.leftClick2(x, y)
+                                break
+
+    async def __check_cards_selection_status(self, initial_dict, play_cards):
         my_hand_cards = await self.get_my_hand_cards()
         pos_list = await self.get_my_hand_cards_pos_list(my_hand_cards)
         if not pos_list:
             return
         
-        cards_pos_defaultdict = defaultdict(list)
+        pos_defaultdict = defaultdict(list)
         for key, value in zip(my_hand_cards, pos_list):
-            cards_pos_defaultdict[key].append(value)
+            pos_defaultdict[key].append(value)
 
-        selected_pos_dict = dict(cards_pos_defaultdict)
-        selected_cards = list(play_cards)
+        after_selected_dict = dict(pos_defaultdict)
+        need_played_cards = list(play_cards)
 
-        print(f"initial_pos_dict: {initial_pos_dict}")
-        print()
-        
-        print(f"selected_pos_dict: {selected_pos_dict}")
-        print()
+        # if compare_dict_consistent(initial_dict, after_selected_dict):
+        #     self.clickCards(play_cards)
+        #     return
 
-        missing_cards, extra_cards = self.__check_selected_cards(initial_pos_dict, selected_pos_dict, selected_cards)
+        self.__check_missing_and_extra_cards(initial_dict, after_selected_dict, need_played_cards)
 
-        print(f'missing_cards: {missing_cards}')
-        print()
-
-        print(f'extra_cards: {extra_cards}')
-        print()
-        
     async def clickCards(self, cards):
+        success = False
         my_hand_cards = await self.get_my_hand_cards()
         pos_list = await self.get_my_hand_cards_pos_list(my_hand_cards)
         if not pos_list:
-            return
+            return success
         
         # defaultdict 允许重复的 key
         cards_pos_defaultdict = defaultdict(list)
@@ -445,14 +495,12 @@ class GameHelper:
 
         # 点击前的所有手牌位置（将 defaultdict 转换为普通字典）
         cards_pos_dict = dict(cards_pos_defaultdict)
-        initial_pos_dict = copy.deepcopy(cards_pos_dict)
+        initial_dict = copy.deepcopy(cards_pos_dict)
 
         action = [RealCard2EnvCard[c] for c in list(cards)]
         m_type = md.get_move_type(action)
         if m_type["type"] not in [md.TYPE_1_SINGLE, md.TYPE_8_SERIAL_SINGLE]:
             click_pos_dict = find_repeated_cards_click_position(cards, cards_pos_dict)
-            # print(f'被点击的手牌及其坐标: {click_pos_dict}')
-            # print()
             if len(click_pos_dict) > 0:
                 for card, coords in click_pos_dict.items():
                     if len(coords) == 2:
@@ -480,7 +528,9 @@ class GameHelper:
                 self.screenHelper.leftClick2(x, y)
                 time.sleep(0.2)
 
-        await self.verify_and_reselect(initial_pos_dict, play_cards=cards)
+        time.sleep(1)
+
+        await self.__check_cards_selection_status(initial_dict, play_cards=cards)
 
     async def clickBtn(self, btnName):
         btnPos = self.screenHelper.getCapturePosition(areaName=btnName)

@@ -1,6 +1,6 @@
 {
-    "window_width": 1920,
-    "window_height": 1080,
+    "window_width": 1600,
+    "window_height": 900,
     "window_class_name": "UnityWndClass",
     "screenshot_image_logs": false,
     "template_match_image_logs": false,
@@ -45,7 +45,7 @@
         "game_result": "0.704166667,0.256481481,0.2015625,0.089814815"
     },
     "bid_threshold": 0.6,
-    "redouble_threshold": 0.7,
-    "super_redouble_threshold": 0.8,
-    "mingpai_threshold": 0.95
+    "redouble_threshold": 0.65,
+    "super_redouble_threshold": 0.7,
+    "mingpai_threshold": 0.99
 }

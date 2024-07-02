@@ -230,47 +230,43 @@ class GameEnv(object):
 
             # 如果游戏还没结束，更新当前行动玩家和游戏信息集合
             if not self.game_over:
-                # print(f"env log: 上一次行动玩家是 {self.acting_player_position}")
-                # print()
                 self.get_acting_player_position()
-                # print(f"env log: 当前行动玩家是 {self.acting_player_position}（更新后）")
-                # print()
                 self.game_infoset = self.get_infoset()
 
         # 按照置信度排序
         action_list.sort(key=self.compare_action, reverse=True)
 
-        # 根据特定规则进一步调整动作选择
-        if len(action_list) >= 2:
-            # 检查 第一个动作（优先级最高的动作）的胜率 是否小于 0
-            # 如果胜率小于 0，则执行下面的逻辑
-            if float(action_list[0][1]) < 0:
-                action_list.sort(key=self.compare_action, reverse=True)
+        # # 根据特定规则进一步调整动作选择
+        # if len(action_list) >= 2:
+        #     # 检查 第一个动作（优先级最高的动作）的胜率 是否小于 0
+        #     # 如果胜率小于 0，则执行下面的逻辑
+        #     if float(action_list[0][1]) < 0:
+        #         action_list.sort(key=self.compare_action, reverse=True)
 
-                # 选择第二优先级的动作
-                action, actions_confidence = action_list[1][0], action_list[1][1]
-                win_rate = actions_confidence
+        #         # 选择第二优先级的动作
+        #         action, actions_confidence = action_list[1][0], action_list[1][1]
+        #         win_rate = actions_confidence
 
-            # 如果 action 为空
-            if not action:
-                # 检查 第二优先级动作 的胜率（乘以 8）是否大于 1
-                if float(action_list[1][1]) * 8 > 1:
-                    action_list.sort(key=self.compare_action, reverse=True)
+        #     # 如果 action 为空
+        #     if not action:
+        #         # 检查 第二优先级动作 的胜率（乘以 8）是否大于 1
+        #         if float(action_list[1][1]) * 8 > 1:
+        #             action_list.sort(key=self.compare_action, reverse=True)
 
-                    # 选择第二优先级的动作（第二选择的胜率大于1，直接出）
-                    action, actions_confidence = action_list[1][0], action_list[1][1]
-                    win_rate = actions_confidence
+        #             # 选择第二优先级的动作（第二选择的胜率大于1，直接出）
+        #             action, actions_confidence = action_list[1][0], action_list[1][1]
+        #             win_rate = actions_confidence
                 
-                # 检查以下条件是否成立：
-                # - position 是否为 "landlord"
-                # - 第一优先级动作 和 第二优先级动作 的胜率差异（乘以 8）是否小于 0.2
-                # - 第二优先级动作 的胜率（乘以 8）是否大于 0
-                if (position == "landlord" and (float(action_list[0][1]) - float(action_list[1][1])) * 8 < 0.2 and float(action_list[1][1]) * 8 > 0):
-                    action_list.sort(key=self.compare_action, reverse=True)
+        #         # 检查以下条件是否成立：
+        #         # - position 是否为 "landlord"
+        #         # - 第一优先级动作 和 第二优先级动作 的胜率差异（乘以 8）是否小于 0.2
+        #         # - 第二优先级动作 的胜率（乘以 8）是否大于 0
+        #         if (position == "landlord" and (float(action_list[0][1]) - float(action_list[1][1])) * 8 < 0.2 and float(action_list[1][1]) * 8 > 0):
+        #             action_list.sort(key=self.compare_action, reverse=True)
                     
-                    # 选择第二优先级的动作（地主第二选择胜率大于0，且与第一选择相差小于0.2，直接出）
-                    action, actions_confidence = action_list[1][0], action_list[1][1]
-                    win_rate = actions_confidence
+        #             # 选择第二优先级的动作（地主第二选择胜率大于0，且与第一选择相差小于0.2，直接出）
+        #             action, actions_confidence = action_list[1][0], action_list[1][1]
+        #             win_rate = actions_confidence
 
         # 构建返回的信息
         action_message = {

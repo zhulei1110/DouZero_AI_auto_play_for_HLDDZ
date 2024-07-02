@@ -1,3 +1,5 @@
+from enum import Enum
+
 RealCards = ['D', 'X', '2', 'A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3']
 
 Bombs = [
@@ -105,3 +107,8 @@ RealCard2IdxMap = {
     'X': 13,
     'D': 14
 }
+
+class AutomaticModeEnum(Enum):
+    FULL = 1
+    SEMI = 2
+    MANUAL = 3

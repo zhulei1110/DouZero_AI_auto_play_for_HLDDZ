@@ -17,25 +17,42 @@ from douzero.env.game_new import GameEnv
 from douzero.env.move_detector import get_move_type
 from douzero.evaluation.deep_agent_new import DeepAgent
 
-from constants import RealCard2EnvCard, EnvCard2RealCard, AllEnvCard
+from constants import RealCard2EnvCard, EnvCard2RealCard, AllEnvCard, AutomaticModeEnum
 from utils import remove_chars_from_string
 
 # 玩家位置（0：地主上家，1：地主，2：地主下家）
 PlayerPosition = ['landlord_up', 'landlord', 'landlord_down']
 
 class WorkerThread(QThread):
-    # finished_signal = pyqtSignal()
+    card_recorder_signal = pyqtSignal(str)
+    three_cards_signal = pyqtSignal(str)
+    my_position_signal = pyqtSignal(str)
+    ai_suggestion_signal = pyqtSignal(list)
+    bid_win_rate_signal = pyqtSignal(list)
+    game_win_rate_signal = pyqtSignal(float)
+    played_card_signal = pyqtSignal(list)
 
-    def __init__(self):
+    def __init__(self, automatic_mode, bid_threshold, redouble_threshold, super_redouble_threshold, mingpai_threshold):
         super(WorkerThread, self).__init__()
         self.config = Config.load()
         self.screenHelper = ScreenHelper()
         self.imageLocator = ImageLocator(self.screenHelper)
         self.gameHelper = GameHelper(self.imageLocator, self.screenHelper)
+        
+        self.bid_threshold = bid_threshold if bid_threshold else self.config.bid_threshold
+        self.redouble_threshold = redouble_threshold if redouble_threshold else self.config.redouble_threshold
+        self.super_redouble_threshold = super_redouble_threshold if super_redouble_threshold else self.config.super_redouble_threshold
+        self.mingpai_threshold = mingpai_threshold if mingpai_threshold else self.config.mingpai_threshold
 
+        print('self.bid_threshold: ', self.bid_threshold)
+        print('self.redouble_threshold: ', self.redouble_threshold)
+        print('self.super_redouble_threshold: ', self.super_redouble_threshold)
+        print('self.mingpai_threshold: ', self.mingpai_threshold)
+
+        self.automatic_mode = automatic_mode
         self.worker_runing = False              # 线程是否在运行
 
-        self.auto_play_cards = True            # 是否自动打牌（无需人为操作）
+        # self.auto_play_cards = False            # 是否自动打牌（无需人为操作）
         self.in_game_start_screen = False       # 是否进入开始游戏界面
         self.game_started = False               # 游戏是否已开局
         self.landlord_confirmed = False         # 是否已确认地主
@@ -134,17 +151,17 @@ class WorkerThread(QThread):
             print("----- WORKER FINISHED -----")
             print()
 
-        # self.finished_signal.emit()
-
     async def before_start(self):
         print('正在检测是否开局...')
 
         self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
         while self.worker_runing and not self.in_game_start_screen:
-            if self.auto_play_cards:
+            # if self.auto_play_cards:
+            if self.automatic_mode == AutomaticModeEnum.FULL.value:
                 success = await self.gameHelper.clickBtn('quick_start_btn')
                 if not success:
                     success = await self.gameHelper.clickBtn('continue_game_btn')
+            
             print("等待手动进入开始游戏界面...")
             self.in_game_start_screen = await self.gameHelper.check_if_in_game_start_screen()
             time.sleep(1)
@@ -158,8 +175,10 @@ class WorkerThread(QThread):
                 print("对局尚未开始")
 
             while self.worker_runing and not game_started:
-                if self.auto_play_cards:
+                # if self.auto_play_cards:
+                if self.automatic_mode == AutomaticModeEnum.FULL.value:
                     await self.gameHelper.clickBtn('start_game_btn')
+                
                 print("等待手动开始对局...")
                 game_started = await self.gameHelper.check_if_game_started()
                 time.sleep(1)
@@ -250,6 +269,7 @@ class WorkerThread(QThread):
     def round_ended(self):
         self.round_count += 1
         self.reset_status()
+        self.reset_ui_status()
         self.reset_ai_env()
         print('本轮对局已结束')
         print()
@@ -300,11 +320,19 @@ class WorkerThread(QThread):
         self.action_message = None
         self.action_list = None
 
+    def reset_ui_status(self):
+        self.card_recorder_signal.emit('')
+        self.three_cards_signal.emit('')
+        self.my_position_signal.emit('')
+        self.ai_suggestion_signal.emit([])
+        self.bid_win_rate_signal.emit([])
+        self.game_win_rate_signal.emit(-1000)
+        self.played_card_signal.emit([])
+
     def stop_task(self):
-        self.worker_runing = False
-        self.round_count = 0
-        self.reset_status()
         print("正在停止工作线程...")
+        self.worker_runing = False
+        self.reset_ui_status()
     
     async def getThreeCards(self):
         print("正在识别三张底牌...")
@@ -318,6 +346,8 @@ class WorkerThread(QThread):
         print(f"三张底牌：{self.three_cards}")
         print()
 
+        self.three_cards_signal.emit(self.three_cards)
+
     async def getMyPosition(self):
         print("正在识别我的角色...")
 
@@ -329,6 +359,8 @@ class WorkerThread(QThread):
 
         print("我的角色：", self.my_position)
         print()
+
+        self.my_position_signal.emit(self.my_position)
 
     async def getMyHandCards(self):
         print("正在识别我的手牌...")
@@ -360,6 +392,7 @@ class WorkerThread(QThread):
 
         # 将 self.other_player_hand_cards 中的 env牌编码转换为实际的牌面字符，并将它们组合成一个字符串，最后将其反转
         self.other_hands_cards_str = str(''.join([EnvCard2RealCard[c] for c in self.other_hands_cards]))[::-1]
+        self.card_recorder_signal.emit(self.other_hands_cards_str)
 
     def initAllPlayerCardData(self):
         # 这里将牌局的相关数据更新到 self.all_player_card_data 中，包括底牌和每个角色的手牌
@@ -386,6 +419,9 @@ class WorkerThread(QThread):
             if rightBuchu is not None:
                 print("右侧玩家 >>> 不出牌")
                 print()
+
+                rightPosition = PlayerPosition[(self.my_position_code + 1) % 3]
+                self.played_card_signal.emit([rightPosition, 'Pass'])
         
         tempArr = []
         if rightBuchu is None:
@@ -414,12 +450,14 @@ class WorkerThread(QThread):
         if rightPlayed:
             print(f"右侧玩家 >>> 已出牌：{rightPlayedCards}")
             print()
+
+            rightPosition = PlayerPosition[(self.my_position_code + 1) % 3]
+            self.played_card_signal.emit([rightPosition, rightPlayedCards])
         
         if (rightBuchu is not None) or rightPlayed:
             if rightPlayed:
                 self.other_hands_cards_str = remove_chars_from_string(self.other_hands_cards_str, rightPlayedCards)
-                # print(f"其他玩家剩余手牌：{self.other_hands_cards_str}")
-                # print()
+                self.card_recorder_signal.emit(self.other_hands_cards_str)
             
             tempData = rightPlayedCards if rightPlayed else ""
             self.other_played_cards_env = [RealCard2EnvCard[c] for c in list(tempData)]
@@ -440,6 +478,9 @@ class WorkerThread(QThread):
             if leftBuchu is not None:
                 print("左侧玩家 >>> 不出牌")
                 print()
+
+                leftPosition = PlayerPosition[(self.my_position_code + 2) % 3]
+                self.played_card_signal.emit([leftPosition, 'Pass'])
 
         tempArr = []
         if leftBuchu is None:
@@ -469,11 +510,13 @@ class WorkerThread(QThread):
             print(f"左侧玩家 >>> 已出牌：{leftPlayedCards}")
             print()
 
+            leftPosition = PlayerPosition[(self.my_position_code + 2) % 3]
+            self.played_card_signal.emit([leftPosition, leftPlayedCards])
+
         if (leftBuchu is not None) or leftPlayed:
             if leftPlayed:
                 self.other_hands_cards_str = remove_chars_from_string(self.other_hands_cards_str, leftPlayedCards)
-                # print(f"其他玩家剩余手牌：{self.other_hands_cards_str}")
-                # print()
+                self.card_recorder_signal.emit(self.other_hands_cards_str)
             
             tempData = leftPlayedCards if leftPlayed else ""
             self.other_played_cards_env = [RealCard2EnvCard[c] for c in list(tempData)]
@@ -495,13 +538,16 @@ class WorkerThread(QThread):
             self.action_message = action_message
             self.action_list = action_list
 
+            self.ai_suggestion_signal.emit(self.action_list)
             self.ai_suggested_received = True
 
         ai_suggested_play_cards = None
         if self.action_message["action"] == "":
             print(f"AI 建议不出牌")
             print()
-            if self.auto_play_cards:
+
+            # if self.auto_play_cards:
+            if self.automatic_mode == AutomaticModeEnum.FULL.value:
                 success = await self.gameHelper.clickBtn('not_play_cards_btn')
                 if not success:
                     success = await self.gameHelper.clickBtn('can_not_play_cards_btn')
@@ -510,12 +556,15 @@ class WorkerThread(QThread):
             print(f"AI 建议出牌：{ai_suggested_play_cards}，胜率：{round(self.action_message['win_rate'], 3)}")
             print()
 
-            if self.auto_play_cards:
+            # if self.auto_play_cards:
+            if self.automatic_mode == AutomaticModeEnum.FULL.value or self.automatic_mode == AutomaticModeEnum.SEMI.value:
                 if not self.my_played_card_clicked:
                     await self.gameHelper.clickCards(ai_suggested_play_cards)
-                    time.sleep(0.5)
-                    await self.gameHelper.clickBtn('play_cards_btn')
                     self.my_played_card_clicked = True
+                    time.sleep(0.5)
+
+                    if self.automatic_mode == AutomaticModeEnum.FULL.value:
+                        await self.gameHelper.clickBtn('play_cards_btn')
         
         myBuchu = None
         if not firstOfRound:
@@ -523,6 +572,8 @@ class WorkerThread(QThread):
             if myBuchu is not None:
                 print("我 >>> 不出牌")
                 print()
+
+                self.played_card_signal.emit([self.my_position, 'Pass'])
 
         tempArr = []
         if myBuchu is None:
@@ -551,6 +602,8 @@ class WorkerThread(QThread):
         if myPlayed:
             print(f"我 >>> 已出牌：{myPlayedCards}")
             print()
+
+            self.played_card_signal.emit([self.my_position, myPlayedCards])
         
         if (myBuchu is not None) or myPlayed:
             tempData = myPlayedCards if myPlayed else ""
@@ -580,8 +633,9 @@ class WorkerThread(QThread):
         while self.worker_runing and self.in_bidding_progress:
             await self.get_player_bidding_status()
 
-            if self.auto_play_cards:
-                if win_rate > self.config.bid_threshold:
+            # if self.auto_play_cards:
+            if self.automatic_mode == AutomaticModeEnum.FULL.value:
+                if win_rate > self.bid_threshold:
                     call_success = await self.gameHelper.clickBtn('call_landlord_btn')
                     if call_success:
                         continue
@@ -608,12 +662,13 @@ class WorkerThread(QThread):
         self.in_redouble_progress = True
         win_rate = await self.get_game_win_rate()
         while self.worker_runing and self.in_redouble_progress:
-            if self.auto_play_cards:
-                if win_rate > self.config.super_redouble_threshold:
+            # if self.auto_play_cards:
+            if self.automatic_mode == AutomaticModeEnum.FULL.value:
+                if win_rate > self.super_redouble_threshold:
                     success = await self.gameHelper.clickBtn('super_redouble_btn')
                     if not success:
                         success = await self.gameHelper.clickBtn('redouble_btn')
-                elif win_rate > self.config.redouble_threshold:
+                elif win_rate > self.redouble_threshold:
                     await self.gameHelper.clickBtn('redouble_btn')
                 else:
                     await self.gameHelper.clickBtn('not_redouble_btn')
@@ -727,16 +782,18 @@ class WorkerThread(QThread):
             success = len(my_hand_cards) == 17
             time.sleep(0.2)
 
+        bidScore = BidModel.predict_score(my_hand_cards)
+        bidWinRate = round(bidScore, 3)
+        print(f"预测叫地主胜率：{bidWinRate}")
+        print()
+
         notBidScore = FarmerModel.predict(my_hand_cards, "farmer")
-        print(f"预测不叫地主胜率：{round(notBidScore, 3)}")
+        notBidWinRate = round(notBidScore, 3)
+        print(f"预测不叫地主胜率：{notBidWinRate}")
         print()
 
-        result = BidModel.predict_score(my_hand_cards)
-        print(f"预测叫地主胜率：{round(result, 3)}")
-        print()
-
-        win_rate = round(result, 3)
-        return win_rate
+        self.bid_win_rate_signal.emit([bidWinRate, notBidWinRate])
+        return bidWinRate
 
     async def get_game_win_rate(self):
         if self.my_position_code == 1:
@@ -753,5 +810,6 @@ class WorkerThread(QThread):
             print()
         
         win_rate = round(result, 3)
+        self.game_win_rate_signal.emit(win_rate)
         return win_rate
 

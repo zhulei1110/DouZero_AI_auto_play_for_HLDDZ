@@ -1,5 +1,6 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 
+from constants import AutomaticModeEnum, RealCards
 from helpers.ScreenHelper import ScreenHelper
 from worker import WorkerThread
 
@@ -20,16 +21,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.main_layout  = QtWidgets.QVBoxLayout(central_widget)
 
         self.create_comboBox()
-        self.create_card_table()
-        self.create_three_card_label()
-        self.create_three_tables()
+        self.create_card_counter_table()
+        self.create_label()
+        self.create_other_tables()
         self.create_actions()
 
-        # self.startBtn = QtWidgets.QPushButton("Start Thread", self)
-        # self.startBtn.clicked.connect(self.handle_button)
-        # self.main_layout.addWidget(self.startBtn)
-
         self.workerThread = None
+        self.bid_threshold = 0.6
+        self.redouble_threshold = 0.65
+        self.super_redouble_threshold = 0.7
+        self.mingpai_threshold = 0.95
+        self.automatic_mode = AutomaticModeEnum.FULL.value
         self.screenHelper.setWindowSize()
 
     # 禁用窗口拖拽和缩放
@@ -38,6 +40,224 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def moveEvent(self, event):
         self.move(self.x(), self.y())
+
+    def handle_cbBid_selection_changed(self):
+        current_value = self.cbBid.currentData()
+        self.bid_threshold = float(current_value)
+
+    def handle_cbRedoubleX2_selection_changed(self):
+        current_value = self.cbRedoubleX2.currentData()
+        self.redouble_threshold = float(current_value)
+
+    def handle_cbRedoubleX4_selection_changed(self):
+        current_value = self.cbRedoubleX4.currentData()
+        self.super_redouble_threshold = float(current_value)
+
+    def handle_cbMingpai_selection_changed(self):
+        current_value = self.cbMingpai.currentData()
+        self.mingpai_threshold = float(current_value)
+
+    def handle_cbMode_selection_changed(self):
+        current_value = self.cbMode.currentData()
+        self.automatic_mode = AutomaticModeEnum(current_value).value
+
+    def set_status(self, running):
+        self.cbBid.setEnabled(not running)
+        self.cbRedoubleX2.setEnabled(not running)
+        self.cbRedoubleX4.setEnabled(not running)
+        self.cbMingpai.setEnabled(not running)
+        self.cbMode.setEnabled(not running)
+
+    def handle_startBtn_clicked(self):
+        if self.workerThread is None:
+            self.workerThread = WorkerThread(self.automatic_mode, self.bid_threshold, self.redouble_threshold, self.super_redouble_threshold, self.mingpai_threshold)
+            self.workerThread.card_recorder_signal.connect(self.handle_card_recorder_update)
+            self.workerThread.three_cards_signal.connect(self.handle_three_cards_update)
+            self.workerThread.my_position_signal.connect(self.handle_my_position_update)
+            self.workerThread.ai_suggestion_signal.connect(self.handle_ai_suggestion_update)
+            self.workerThread.bid_win_rate_signal.connect(self.handle_bid_win_rate_update)
+            self.workerThread.game_win_rate_signal.connect(self.handle_game_win_rate_update)
+            self.workerThread.played_card_signal.connect(self.handle_played_card_update)
+
+        if not self.workerThread.isRunning():
+            self.workerThread.start()
+            self.startBtn.setText("停止")
+            self.set_status(True)
+        else:
+            self.workerThread.stop_task()
+            self.workerThread.quit()
+            self.workerThread.wait()
+            self.workerThread = None
+            self.startBtn.setText("启动")
+            self.set_status(False)
+
+    def handle_card_recorder_update(self, result):
+        font = QtGui.QFont("微软雅黑", 10, QtGui.QFont.Bold)
+
+        for i in range(15):
+            char = RealCards[i]
+            num = result.count(char)
+
+            newItem = QtWidgets.QTableWidgetItem(str(num))
+            newItem.setFont(font)
+            newItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            newItem.setBackground(QtGui.QColor('#404040'))
+            newItem.setForeground(QtGui.QColor('#ffffff'))
+
+            if num == 4:
+                newItem.setForeground(QtGui.QColor("#ff0000"))
+            if num == 0:
+                newItem.setForeground(QtGui.QColor("#7c7c7c"))
+            
+            self.cardCounterTable.setItem(1, i, newItem)
+
+    def handle_three_cards_update(self, result):
+        if len(result) == 0:
+            self.threeCardsLabel.setText('---')
+            return
+        
+        self.threeCardsLabel.setText(result)
+
+    def handle_my_position_update(self, result):
+        if len(result) == 0:
+            self.myPositionLabel.setText('---')
+            return
+        
+        posotionTextMap = {
+            'landlord_up': '农民（地主上家）',
+            'landlord': '地主',
+            'landlord_down': '农民（地主下家）',
+        }
+
+        self.myPositionLabel.setText(posotionTextMap[result])
+
+    def handle_ai_suggestion_update(self, result):
+        font_content = QtGui.QFont("微软雅黑", 8, QtGui.QFont.Bold)
+
+        if len(result) == 0 or not isinstance(result, list):
+            for i in range(3):
+                emplty_item1 = QtWidgets.QTableWidgetItem('-')
+                emplty_item1.setFont(font_content)
+                emplty_item1.setTextAlignment(QtCore.Qt.AlignCenter)
+                emplty_item2 = QtWidgets.QTableWidgetItem('-')
+                emplty_item2.setFont(font_content)
+                emplty_item2.setTextAlignment(QtCore.Qt.AlignCenter)
+                self.suggestionTable.setItem(i + 1, 0, emplty_item1)
+                self.suggestionTable.setItem(i + 1, 1, emplty_item2)
+            
+            return
+        
+        for i in range(3):
+            data = result[i] if len(result) > i else ('-', '-')
+            left_item = QtWidgets.QTableWidgetItem(data[0])
+            left_item.setFont(font_content)
+            left_item.setTextAlignment(QtCore.Qt.AlignCenter)
+            left_item.setForeground(QtGui.QColor("#0000FF"))
+            self.suggestionTable.setItem(i + 1, 0, left_item)
+
+            right_item = QtWidgets.QTableWidgetItem(data[1])
+            right_item.setFont(font_content)
+            right_item.setTextAlignment(QtCore.Qt.AlignCenter)
+
+            if data[1] != '-':
+                if float(data[1]) >= 1:
+                    right_item.setForeground(QtGui.QColor("#ff0000"))
+                elif float(data[1]) < 1:
+                    right_item.setForeground(QtGui.QColor("#000000"))
+                elif float(data[1]) < 0.1:
+                    right_item.setForeground(QtGui.QColor("#00FF00"))
+
+            self.suggestionTable.setItem(i + 1, 1, right_item)
+
+    def handle_bid_win_rate_update(self, result):
+        font_content = QtGui.QFont("微软雅黑", 8, QtGui.QFont.Bold)
+
+        if len(result) == 0 or not isinstance(result, list):
+            emptyItem1 = QtWidgets.QTableWidgetItem("-")
+            emptyItem1.setFont(font_content)
+            emptyItem1.setTextAlignment(QtCore.Qt.AlignCenter)
+            emptyItem2 = QtWidgets.QTableWidgetItem("-")
+            emptyItem2.setFont(font_content)
+            emptyItem2.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.predictInfoTable.setItem(1, 1, emptyItem1)
+            self.predictInfoTable.setItem(2, 1, emptyItem2)
+            return
+        
+        font_content = QtGui.QFont("微软雅黑", 8, QtGui.QFont.Bold)
+
+        bidItem = QtWidgets.QTableWidgetItem(f"{result[0]}")
+        bidItem.setFont(font_content)
+        bidItem.setTextAlignment(QtCore.Qt.AlignCenter)
+
+        if result[0] >= self.bid_threshold:
+            bidItem.setForeground(QtGui.QColor("#ff0000"))
+        else:
+            bidItem.setForeground(QtGui.QColor("#00FF00"))
+
+        notBidItem = QtWidgets.QTableWidgetItem(f"{result[1]}")
+        notBidItem.setFont(font_content)
+        notBidItem.setTextAlignment(QtCore.Qt.AlignCenter)
+        
+        if result[1] >= self.bid_threshold:
+            notBidItem.setForeground(QtGui.QColor("#ff0000"))
+        else:
+            notBidItem.setForeground(QtGui.QColor("#00FF00"))
+
+        self.predictInfoTable.setItem(1, 1, bidItem)
+        self.predictInfoTable.setItem(2, 1, notBidItem)
+    
+    def handle_game_win_rate_update(self, result):
+        font_content = QtGui.QFont("微软雅黑", 8, QtGui.QFont.Bold)
+
+        if not result or result == -1000:
+            emptyItem = QtWidgets.QTableWidgetItem("-")
+            emptyItem.setFont(font_content)
+            emptyItem.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.predictInfoTable.setItem(3, 1, emptyItem)
+            return
+
+        gameWinItem = QtWidgets.QTableWidgetItem(f"{result}")
+        gameWinItem.setFont(font_content)
+        gameWinItem.setTextAlignment(QtCore.Qt.AlignCenter)
+        
+        if result >= self.redouble_threshold:
+            gameWinItem.setForeground(QtGui.QColor("#ff0000"))
+        elif result < self.redouble_threshold:
+            gameWinItem.setForeground(QtGui.QColor("#000000"))
+        elif result < 0.5:
+            gameWinItem.setForeground(QtGui.QColor("#00FF00"))
+
+        self.predictInfoTable.setItem(3, 1, gameWinItem)
+
+    def handle_played_card_update(self, result):
+        font_content = QtGui.QFont("微软雅黑", 8, QtGui.QFont.Bold)
+
+        if len(result) == 0 or not isinstance(result, list):
+            emptyItem1 = QtWidgets.QTableWidgetItem("-")
+            emptyItem1.setFont(font_content)
+            emptyItem1.setTextAlignment(QtCore.Qt.AlignCenter)
+            emptyItem2 = QtWidgets.QTableWidgetItem("-")
+            emptyItem2.setFont(font_content)
+            emptyItem2.setTextAlignment(QtCore.Qt.AlignCenter)
+            emptyItem3 = QtWidgets.QTableWidgetItem("-")
+            emptyItem3.setFont(font_content)
+            emptyItem3.setTextAlignment(QtCore.Qt.AlignCenter)
+            self.playedCardsTable.setItem(1, 1, emptyItem1)
+            self.playedCardsTable.setItem(2, 1, emptyItem2)
+            self.playedCardsTable.setItem(3, 1, emptyItem3)
+            return
+
+        playedCardRightItem = QtWidgets.QTableWidgetItem(result[1])
+        playedCardRightItem.setFont(font_content)
+        playedCardRightItem.setTextAlignment(QtCore.Qt.AlignCenter)
+        playedCardRightItem.setForeground(QtGui.QColor("#0000FF"))
+
+        if result[0] == 'landlord_up':
+            self.playedCardsTable.setItem(1, 1, playedCardRightItem)
+        elif result[0] == 'landlord':
+            self.playedCardsTable.setItem(2, 1, playedCardRightItem)
+        elif result[0] == 'landlord_down':
+            self.playedCardsTable.setItem(3, 1, playedCardRightItem)
 
     def create_comboBox(self):
         combo_layout = QtWidgets.QHBoxLayout()
@@ -52,14 +272,21 @@ class MainWindow(QtWidgets.QMainWindow):
         label1.setFont(label_font)
         label1.setAlignment(QtCore.Qt.AlignLeft)
 
-        comboBox1 = QtWidgets.QComboBox()
-        comboBox1.addItems(["保守（0.7）", "平稳（0.6）", "激进（0.5）"])
-        comboBox1.setFont(comboBox_font)
-        comboBox1.setFixedWidth(180)
-        comboBox1.setCurrentIndex(1)
+        self.cbBid = QtWidgets.QComboBox()
+        self.cbBid.addItem('稳健+ (0.75)', 0.75)
+        self.cbBid.addItem('稳健  (0.7)', 0.7)
+        self.cbBid.addItem('均衡+ (0.65)', 0.65)
+        self.cbBid.addItem('均衡  (0.6)', 0.6)
+        self.cbBid.addItem('均衡- (0.55)', 0.55)
+        self.cbBid.addItem('进取  (0.5)', 0.5)
+        self.cbBid.addItem('进取+ (0.45)', 0.45)
+        self.cbBid.setFont(comboBox_font)
+        self.cbBid.setFixedWidth(180)
+        self.cbBid.setCurrentIndex(3)
+        self.cbBid.currentIndexChanged.connect(self.handle_cbBid_selection_changed)
 
         layout1.addWidget(label1)
-        layout1.addWidget(comboBox1)
+        layout1.addWidget(self.cbBid)
         layout1.setAlignment(QtCore.Qt.AlignLeft)
         combo_layout.addLayout(layout1)
 
@@ -69,14 +296,21 @@ class MainWindow(QtWidgets.QMainWindow):
         label2.setFont(label_font)
         label2.setAlignment(QtCore.Qt.AlignLeft)
 
-        comboBox2 = QtWidgets.QComboBox()
-        comboBox2.addItems(["保守（0.75）", "平稳（0.65）", "激进（0.55）"])
-        comboBox2.setFont(comboBox_font)
-        comboBox2.setFixedWidth(180)
-        comboBox2.setCurrentIndex(1)
+        self.cbRedoubleX2 = QtWidgets.QComboBox()
+        self.cbRedoubleX2.addItem('稳健+ (0.8)', 0.8)
+        self.cbRedoubleX2.addItem('稳健  (0.75)', 0.75)
+        self.cbRedoubleX2.addItem('均衡+ (0.7)', 0.7)
+        self.cbRedoubleX2.addItem('均衡  (0.65)', 0.65)
+        self.cbRedoubleX2.addItem('均衡- (0.6)', 0.6)
+        self.cbRedoubleX2.addItem('进取  (0.55)', 0.55)
+        self.cbRedoubleX2.addItem('进取+ (0.5)', 0.5)
+        self.cbRedoubleX2.setFont(comboBox_font)
+        self.cbRedoubleX2.setFixedWidth(180)
+        self.cbRedoubleX2.setCurrentIndex(3)
+        self.cbRedoubleX2.currentIndexChanged.connect(self.handle_cbRedoubleX2_selection_changed)
 
         layout2.addWidget(label2)
-        layout2.addWidget(comboBox2)
+        layout2.addWidget(self.cbRedoubleX2)
         layout2.setAlignment(QtCore.Qt.AlignLeft)
         combo_layout.addLayout(layout2)
 
@@ -86,14 +320,21 @@ class MainWindow(QtWidgets.QMainWindow):
         label3.setFont(label_font)
         label3.setAlignment(QtCore.Qt.AlignLeft)
 
-        comboBox3 = QtWidgets.QComboBox()
-        comboBox3.addItems(["保守（0.8）", "平稳（0.7）", "激进（0.6）"])
-        comboBox3.setFont(comboBox_font)
-        comboBox3.setFixedWidth(180)
-        comboBox3.setCurrentIndex(0)
+        self.cbRedoubleX4 = QtWidgets.QComboBox()
+        self.cbRedoubleX4.addItem('稳健+ (0.85)', 0.85)
+        self.cbRedoubleX4.addItem('稳健  (0.8)', 0.8)
+        self.cbRedoubleX4.addItem('均衡+ (0.75)', 0.75)
+        self.cbRedoubleX4.addItem('均衡  (0.7)', 0.7)
+        self.cbRedoubleX4.addItem('均衡- (0.65)', 0.65)
+        self.cbRedoubleX4.addItem('进取  (0.6)', 0.6)
+        self.cbRedoubleX4.addItem('进取+ (0.55)', 0.55)
+        self.cbRedoubleX4.setFont(comboBox_font)
+        self.cbRedoubleX4.setFixedWidth(180)
+        self.cbRedoubleX4.setCurrentIndex(3)
+        self.cbRedoubleX4.currentIndexChanged.connect(self.handle_cbRedoubleX4_selection_changed)
 
         layout3.addWidget(label3)
-        layout3.addWidget(comboBox3)
+        layout3.addWidget(self.cbRedoubleX4)
         layout3.setAlignment(QtCore.Qt.AlignLeft)
         combo_layout.addLayout(layout3)
 
@@ -103,40 +344,47 @@ class MainWindow(QtWidgets.QMainWindow):
         label4.setFont(label_font)
         label4.setAlignment(QtCore.Qt.AlignLeft)
 
-        comboBox4 = QtWidgets.QComboBox()
-        comboBox4.addItems(["保守（1.0）", "平稳（0.95）", "激进（0.9）"])
-        comboBox4.setFont(comboBox_font)
-        comboBox4.setFixedWidth(180)
-        comboBox4.setCurrentIndex(0)
+        self.cbMingpai = QtWidgets.QComboBox()
+        self.cbMingpai.addItem('稳健+ (1.1)', 1.1)
+        self.cbMingpai.addItem('稳健  (0.99)', 0.99)
+        self.cbMingpai.addItem('均衡+ (0.97)', 0.97)
+        self.cbMingpai.addItem('均衡  (0.95)', 0.95)
+        self.cbMingpai.addItem('均衡- (0.93)', 0.93)
+        self.cbMingpai.addItem('进取  (0.91)', 0.91)
+        self.cbMingpai.addItem('进取+ (0.89)', 0.89)
+        self.cbMingpai.setFont(comboBox_font)
+        self.cbMingpai.setFixedWidth(180)
+        self.cbMingpai.setCurrentIndex(1)
+        self.cbMingpai.currentIndexChanged.connect(self.handle_cbMingpai_selection_changed)
 
         layout4.addWidget(label4)
-        layout4.addWidget(comboBox4)
+        layout4.addWidget(self.cbMingpai)
         layout4.setAlignment(QtCore.Qt.AlignLeft)
         combo_layout.addLayout(layout4)
 
         combo_layout.addStretch()
         self.main_layout.addLayout(combo_layout)
 
-    def create_card_table(self):
+    def create_card_counter_table(self):
         # 创建 QTableWidget
-        self.tableWidget = QtWidgets.QTableWidget(self)
-        self.tableWidget.setGeometry(0, 0, 750, 100)  # 设置表格位置和大小
-        self.tableWidget.setFixedHeight(102)
-        self.tableWidget.setRowCount(2)
-        self.tableWidget.setColumnCount(15)
+        self.cardCounterTable = QtWidgets.QTableWidget(self)
+        self.cardCounterTable.setGeometry(0, 0, 750, 100)  # 设置表格位置和大小
+        self.cardCounterTable.setFixedHeight(102)
+        self.cardCounterTable.setRowCount(2)
+        self.cardCounterTable.setColumnCount(15)
 
         # 隐藏表头和行头
-        self.tableWidget.verticalHeader().setVisible(False)
-        self.tableWidget.horizontalHeader().setVisible(False)
+        self.cardCounterTable.verticalHeader().setVisible(False)
+        self.cardCounterTable.horizontalHeader().setVisible(False)
 
         # 去除网格线
-        self.tableWidget.setShowGrid(False)
+        self.cardCounterTable.setShowGrid(False)
 
         # 设置行高和列宽
         for row in range(2):
-            self.tableWidget.setRowHeight(row, 50)
+            self.cardCounterTable.setRowHeight(row, 50)
         for col in range(15):
-            self.tableWidget.setColumnWidth(col, 50)
+            self.cardCounterTable.setColumnWidth(col, 50)
 
         # 设置卡牌名称和数量
         card_names = ['大', '小', '2', 'A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3']
@@ -151,7 +399,7 @@ class MainWindow(QtWidgets.QMainWindow):
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             item.setBackground(QtGui.QColor('#7c7c7c'))
             item.setForeground(QtGui.QColor('#202020'))
-            self.tableWidget.setItem(0, col, item)
+            self.cardCounterTable.setItem(0, col, item)
 
         for col, count in enumerate(card_counts):
             item = QtWidgets.QTableWidgetItem(str(count))
@@ -159,17 +407,17 @@ class MainWindow(QtWidgets.QMainWindow):
             item.setTextAlignment(QtCore.Qt.AlignCenter)
             item.setBackground(QtGui.QColor('#404040'))
             item.setForeground(QtGui.QColor('#ffffff'))
-            self.tableWidget.setItem(1, col, item)
+            self.cardCounterTable.setItem(1, col, item)
 
         # 设置表格不可滚动
-        self.tableWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.tableWidget.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.tableWidget.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self.cardCounterTable.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.cardCounterTable.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.cardCounterTable.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.cardCounterTable.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         
-        self.main_layout.addWidget(self.tableWidget)
+        self.main_layout.addWidget(self.cardCounterTable)
 
-    def create_three_card_label(self):
+    def create_label(self):
         label_layout = QtWidgets.QHBoxLayout()
         label_layout.setContentsMargins(0, 0, 0, 10)
         label_layout.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
@@ -179,16 +427,27 @@ class MainWindow(QtWidgets.QMainWindow):
         label.setFont(font)
 
         font2 = QtGui.QFont("微软雅黑", 9, QtGui.QFont.Bold)
-        label2 = QtWidgets.QLabel("---")
-        label2.setFont(font2)
+        self.threeCardsLabel = QtWidgets.QLabel("---")
+        self.threeCardsLabel.setFont(font2)
 
         label_layout.addWidget(label)
+        label_layout.addWidget(self.threeCardsLabel)
+
+        label_layout.addStretch()
+        
+        label2 = QtWidgets.QLabel("我的身份：")
+        label2.setFont(font)
+
+        self.myPositionLabel = QtWidgets.QLabel("---")
+        self.myPositionLabel.setFont(font2)
+
         label_layout.addWidget(label2)
+        label_layout.addWidget(self.myPositionLabel)
 
         self.main_layout.addLayout(label_layout)
         self.main_layout.addStretch()
 
-    def create_three_tables(self):
+    def create_other_tables(self):
         self.create_predict_info_table()
         self.create_suggestion_table()
         self.create_played_card_table()
@@ -340,7 +599,7 @@ class MainWindow(QtWidgets.QMainWindow):
         headers = ['玩家', '上一次出牌']
         contents = [
             ('上家', '-'),
-            ('我的', '-'),
+            ('地主', '-'),
             ('下家', '-')
         ]
 
@@ -385,39 +644,25 @@ class MainWindow(QtWidgets.QMainWindow):
         right_layout.setContentsMargins(0, 10, 0, 0)
         right_layout.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         
-        font = QtGui.QFont("微软雅黑", 10)
+        font = QtGui.QFont("微软雅黑", 9)
 
-        comboBox = QtWidgets.QComboBox()
-        comboBox.addItems(["自动模式", "手动模式"])
-        comboBox.setFont(font)
-        comboBox.setFixedWidth(120)
-        comboBox.setFixedHeight(40)
-        # comboBox.setStyleSheet("padding-left: 10px;")
-        
-        button = QtWidgets.QPushButton("启动")
-        button.setFont(font)
-        button.setFixedWidth(120)
-        button.setFixedHeight(40)
+        self.cbMode = QtWidgets.QComboBox()
+        self.cbMode.addItem("全自动模式", AutomaticModeEnum.FULL.value)
+        self.cbMode.addItem("半自动模式", AutomaticModeEnum.SEMI.value)
+        self.cbMode.addItem("手动模式", AutomaticModeEnum.MANUAL.value)
+        self.cbMode.setFont(font)
+        self.cbMode.setFixedWidth(140)
+        self.cbMode.setFixedHeight(40)
+        self.cbMode.currentIndexChanged.connect(self.handle_cbMode_selection_changed)
 
-        right_layout.addWidget(comboBox)
-        right_layout.addWidget(button)
+        self.startBtn = QtWidgets.QPushButton("启动", self)
+        self.startBtn.setFont(font)
+        self.startBtn.setFixedWidth(120)
+        self.startBtn.setFixedHeight(40)
+        self.startBtn.clicked.connect(self.handle_startBtn_clicked)
+
+        right_layout.addWidget(self.cbMode)
+        right_layout.addWidget(self.startBtn)
 
         self.main_layout.addLayout(right_layout)
         self.main_layout.addStretch()
-
-    def handle_button(self):
-        if self.workerThread is None:
-            self.workerThread = WorkerThread()
-
-        if not self.workerThread.isRunning():
-            # self.workerThread.finished_signal.connect(self.thread_finished)
-            self.workerThread.start()
-            self.button.setText("Stop Thread")
-        else:
-            self.workerThread.stop_task()
-            self.workerThread.quit()
-            self.workerThread.wait()
-            self.button.setText("Start Thread")
-
-    # def thread_finished(self):
-    #     self.button.setText("Start Thread")
