@@ -6,6 +6,7 @@ douZero_AI_auto_play_for_HLDDZ
 * 模型训练及配置请移步 [DouZero](https://github.com/kwai/DouZero)
 * 感谢 [Vincentzyx](https://github.com/Vincentzyx) 提供的 resnet 模型文件
 * 本项目仅供学习以及技术交流，请勿用于其它目的，否则后果自负
+* discuss with me, QQ 578271364
 
 ## 使用说明
 
