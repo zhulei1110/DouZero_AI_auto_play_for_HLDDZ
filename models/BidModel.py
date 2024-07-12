@@ -117,6 +117,6 @@ def predict_score(cards):
     result = net2(input)
     return result[0].item()
 
-if __name__ == "__main__":
-    print(predict_score("X2AKQJJ8777655443"))
-    print(predict_score("X2AAQJ99887765553"))
+# if __name__ == "__main__":
+#     print(predict_score("X2AKQJJ8777655443"))
+#     print(predict_score("X2AAQJ99887765553"))

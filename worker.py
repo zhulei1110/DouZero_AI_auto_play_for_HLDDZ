@@ -753,11 +753,14 @@ class WorkerThread(QThread):
                 before_prev_no_bid = all(value == 0 for value in self.player_bidding_status[round_num - 2])
                 if prev_no_bid == True and before_prev_no_bid == True:
                     print("连续3局无人叫地主，首家默认为地主")
+                    print()
                 else:
                     print("本局无人叫地主，重新发牌")
+                    print()
                     self.round_ended()
             else:
                 print("本局无人叫地主，重新发牌")
+                print()
                 self.round_ended()
 
     def update_player_bidding_status(self, round_num):

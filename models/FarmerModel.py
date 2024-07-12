@@ -90,7 +90,7 @@ def predict(cards, type="up"):
     y = y.squeeze().item()
     return y
 
-if __name__ == "__main__":
-    print(predict("XAAKQJ98886654433", "up"))
-    print(predict("X2AAKQTT876644333", "down"))
-    print(predict("X2AAQJ99887765553", "farmer"))
+# if __name__ == "__main__":
+#     print(predict("XAAKQJ98886654433", "up"))
+#     print(predict("X2AAKQTT876644333", "down"))
+#     print(predict("X2AAQJ99887765553", "farmer"))
