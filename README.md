@@ -25,3 +25,8 @@ douZero_AI_auto_play_for_HLDDZ
 3. 激活虚拟环境：venv\Scripts\activate
 4. 安装项目依赖：pip install -r requirements.txt
 5. 运行本程序：python -m main
+
+## 程序截图
+
+![jietu01](https://raw.githubusercontent.com/zhulei1110/DouZero_AI_auto_play_for_HLDDZ/main/jietu01.png)
+![jietu02](https://raw.githubusercontent.com/zhulei1110/DouZero_AI_auto_play_for_HLDDZ/main/jietu02.png)
